@@ -48,7 +48,20 @@ class CouchdbkitHandler(object):
         self.__dict__ = self.__shared_state__
 
         # create databases sessions
-        for app_name, uri in databases:
+        for app_name in databases.iterkeys():    
+            uri_dict = COUCHDB_DATABASES[app_name]
+            try:
+                #No Username or Password supplied so uri is just URL
+                if uri_dict['USER'] is '' or uri_dict['PASSWORD'] is '':
+                    uri = uri_dict['URL']
+                #Username and Password are supplied so construct Basic Auth url
+                else:
+                    url = uri_dict['URL'].split('/', 2)
+                    uri = url[0] + '//' + uri_dict['USER'] + ':' + uri_dict['PASSWORD'] + '@' + url[2]
+                print uri
+            except KeyError, why:
+                raise KeyError("COUCHDB_DATABASES setting in settings.py does not have required item %s for app %s" % (why, app_name))
+
 
             try:
                 if isinstance(uri, tuple):
