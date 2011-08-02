@@ -16,8 +16,8 @@ try:
     def is_iterable(c):
         return isinstance(c, Iterable)
 except ImportError:
-    from sets import Set as MutableSet
-    
+    MutableSet = set
+
     def is_iterable(o):
         return hasattr(c, '__iter__')
 
