@@ -9,53 +9,64 @@ All exceptions used in couchdbkit.
 from restkit.errors import ResourceError
 
 class InvalidAttachment(Exception):
-    """ raised when an attachment is invalid """
+    "Raised when an attachment is invalid"
+    pass
 
 class DuplicatePropertyError(Exception):
-    """ exception raised when there is a duplicate 
-    property in a model """
+    "Exception raised when there is a duplicate property in a model"
+    pass
 
 class BadValueError(Exception):
-    """ exception raised when a value can't be validated 
-    or is required """
+    "Exception raised when a value can't be validated or is required"
+    pass
 
 class MultipleResultsFound(Exception):
-    """ exception raised when more than one object is
-    returned by the get_by method"""
-    
+    "Exception raised when more than one object is returned"
+    pass
+
 class NoResultFound(Exception):
-    """ exception returned when no results are found """
-    
+    "Exception returned when no results are found"
+    pass
+
 class ReservedWordError(Exception):
-    """ exception raised when a reserved word
-    is used in Document schema """
-    
+    "Exception raised when a reserved word is used in Document schema"
+    pass
+
 class DocsPathNotFound(Exception):
-    """ exception raised when path given for docs isn't found """
-    
+    "Exception raised when path given for docs isn't found"
+    pass
+
 class BulkSaveError(Exception):
-    """ exception raised when bulk save contain errors.
-    error are saved in `errors` property.
+    """
+    Exception raised when bulk save contains errors. Errors are saved in
+    `errors` property.
     """
     def __init__(self, errors, results, *args):
         self.errors = errors
         self.results = results
 
 class ViewServerError(Exception):
-    """ exception raised by view server"""
+    "Exception raised by view server"
+    pass
 
 class MacroError(Exception):
-    """ exception raised when macro parsiing error in functions """
+    "Exception raised when macro parsiing error in functions"
+    pass
 
 class DesignerError(Exception):
-    """ unkown exception raised by the designer """
+    "Unkown exception raised by the designer"
+    pass
 
 class ResourceNotFound(ResourceError):
-    """ Exception raised when resource is not found"""
+    "Exception raised when resource is not found"
+    pass
 
 class ResourceConflict(ResourceError):
-    """ Exception raised when there is conflict while updating"""
+    "Exception raised when there is conflict while updating"
+    pass
 
 class PreconditionFailed(ResourceError):
-    """ Exception raised when 412 HTTP error is received in response
-    to a request """
+    """
+    Exception raised when 412 HTTP error is received in response to a request
+    """
+    pass
