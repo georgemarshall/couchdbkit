@@ -22,6 +22,7 @@ and manage db sessions
 import sys
 import os
 
+from restkit import BasicAuth
 from couchdbkit import Server
 from couchdbkit import push
 from couchdbkit.resource import CouchdbResource
@@ -48,7 +49,17 @@ class CouchdbkitHandler(object):
         self.__dict__ = self.__shared_state__
 
         # create databases sessions
-        for app_name, uri in databases:
+        for app_name in databases.iterkeys():    
+            uri_dict = COUCHDB_DATABASES[app_name]
+            uri = uri_dict['URL']
+            try:
+                #Username and Password supplied so use BasicAuth
+                if uri_dict['USER'] is not '' or uri_dict['PASSWORD'] is not '':
+                    auth = BasicAuth(uri_dict['USER'], uri_dict['PASSWORD'])
+            
+            except KeyError, why:
+                raise KeyError("COUCHDB_DATABASES setting in settings.py does not have required item %s for app %s" % (why, app_name))
+
 
             try:
                 if isinstance(uri, tuple):
@@ -63,7 +74,7 @@ class CouchdbkitHandler(object):
                     app_name, uri))
 
                 
-            res = CouchdbResource(server_uri, timeout=COUCHDB_TIMEOUT)
+            res = CouchdbResource(server_uri, timeout=COUCHDB_TIMEOUT, filters=[auth])
 
             server = Server(server_uri, resource_instance=res)
             app_label = app_name.split('.')[-1]
