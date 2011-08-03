@@ -52,17 +52,14 @@ class CouchdbkitHandler(object):
         for app_name in databases.iterkeys():    
             uri_dict = COUCHDB_DATABASES[app_name]
             uri = uri_dict['URL']
-            try:
-                #Username and Password supplied so use BasicAuth
-                if uri_dict['USER'] is not '' or uri_dict['PASSWORD'] is not '':
-                    auth = BasicAuth(uri_dict['USER'], uri_dict['PASSWORD'])
-            
-            except KeyError, why:
-                raise KeyError("COUCHDB_DATABASES setting in settings.py does not have required item %s for app %s" % (why, app_name))
 
+            # Blank credentials are valid for the admin party
+            user = uri_dict.get('USER', '')
+            password = uri_dict.get('PASSWORD', '')
+            auth = BasicAuth(user, password)
 
             try:
-                if isinstance(uri, tuple):
+                if isinstance(uri, (list, tuple)):
                     # case when you want to specify server uri 
                     # and database name specifically. usefull
                     # when you proxy couchdb on some path 
@@ -73,7 +70,6 @@ class CouchdbkitHandler(object):
                 raise ValueError("couchdb uri [%s:%s] invalid" % (
                     app_name, uri))
 
-                
             res = CouchdbResource(server_uri, timeout=COUCHDB_TIMEOUT, filters=[auth])
 
             server = Server(server_uri, resource_instance=res)
