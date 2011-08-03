@@ -48,14 +48,19 @@ class CouchdbkitHandler(object):
 
         self.__dict__ = self.__shared_state__
 
+        # Convert old style to new style
+        if isinstance(databases, (list, tuple)):
+            databases = dict(
+                (app_name, {'URL': uri}) for app_name, uri in databases
+            )
+
         # create databases sessions
-        for app_name in databases.iterkeys():    
-            uri_dict = COUCHDB_DATABASES[app_name]
-            uri = uri_dict['URL']
+        for app_name, app_setting in databases.iteritems():
+            uri = app_setting['URL']
 
             # Blank credentials are valid for the admin party
-            user = uri_dict.get('USER', '')
-            password = uri_dict.get('PASSWORD', '')
+            user = app_setting.get('USER', '')
+            password = app_setting.get('PASSWORD', '')
             auth = BasicAuth(user, password)
 
             try:
