@@ -35,6 +35,7 @@ from itertools import groupby
 from mimetypes import guess_type
 import time
 
+from restkit import BasicAuth
 from restkit.util import url_quote
 
 from .exceptions import InvalidAttachment, NoResultFound, \
@@ -66,7 +67,7 @@ class Server(object):
 
     resource_class = resource.CouchdbResource 
 
-    def __init__(self, uri='http://127.0.0.1:5984',
+    def __init__(self, uri={'URL': 'http://127.0.0.1:5984'},
             uuid_batch_count=DEFAULT_UUID_BATCH_COUNT,
             resource_class=None, resource_instance=None, 
             **client_opts):
@@ -78,6 +79,17 @@ class Server(object):
         @param resource_instance: `restkit.resource.CouchdbDBResource` instance.
             It alows you to set a resource class with custom parameters.
         """
+        filters = []
+
+        if isinstance(uri, dict):
+            uri_settings = uri  # Change the refrence to the dict
+
+            uri = uri_settings['URL']
+            # Blank credentials are valid for the admin party
+            user = uri_settings.get('USER', '')
+            password = uri_settings.get('PASSWORD', '')
+
+            filters.append(BasicAuth(user, password))
 
         if not uri or uri is None:
             raise ValueError("Server uri is missing")
@@ -99,7 +111,7 @@ class Server(object):
             if client_opts:
                 self.res.client_opts.update(client_opts)
         else:
-            self.res = self.resource_class(uri, **client_opts)
+            self.res = self.resource_class(uri, filters=filters, **client_opts)
         self._uuids = deque()
         
     def info(self):
