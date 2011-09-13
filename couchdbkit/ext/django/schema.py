@@ -139,7 +139,7 @@ class DocumentMeta(schema.SchemaProperties):
 class Document(schema.Document):
     """ Document object for django extension """
     __metaclass__ = DocumentMeta
-    
+
     get_id = property(lambda self: self['_id'])
     get_rev = property(lambda self: self['_rev'])
 
@@ -151,8 +151,14 @@ class Document(schema.Document):
             db = get_db(app_label)
             cls._db = db
         return db
-    
-DocumentSchema = schema.DocumentSchema    
+
+class StaticDocument(Document):
+    """
+    Shorthand for a document that disallow dynamic properties.
+    """
+    _allow_dynamic_properties = False
+
+DocumentSchema = schema.DocumentSchema
 
 #  properties
 Property = schema.Property
@@ -170,8 +176,6 @@ ListProperty = schema.ListProperty
 DictProperty = schema.DictProperty
 StringListProperty = schema.StringListProperty
 SchemaDictProperty = schema.SchemaDictProperty
-
-
 
 # some utilities
 dict_to_json = schema.dict_to_json
