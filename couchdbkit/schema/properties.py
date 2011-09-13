@@ -120,6 +120,9 @@ class Property(object):
             default = default()
         return default
 
+    def get_internal_type(self):
+        return self.__class__.__name__
+
     def validate(self, value, required=True):
         """ validate value """
         if required and self.empty(value):
