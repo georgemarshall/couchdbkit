@@ -1,8 +1,9 @@
 from __future__ import absolute_import
+from operator import attrgetter
 
 from django.core.exceptions import ObjectDoesNotExist
 from tastypie.bundle import Bundle
-from tastypie.exceptions import BadRequest, NotFound
+from tastypie.exceptions import BadRequest, NotFound, InvalidSortError
 from tastypie.fields import (CharField, DateTimeField, BooleanField,
 FloatField, DecimalField, IntegerField, TimeField, ListField, DictField)
 from tastypie.resources import Resource, DeclarativeMetaclass
@@ -228,16 +229,48 @@ class DocumentResource(Resource):
     #     """
     #     return filters
 
-    # def apply_sorting(self, obj_list, options=None):
-    #     """
-    #     Allows for the sorting of objects being returned.
-    # 
-    #     This needs to be implemented at the user level.
-    # 
-    #     ``ModelResource`` includes a full working version specific to Django's
-    #     ``Models``.
-    #     """
-    #     return obj_list
+    def apply_sorting(self, obj_list, options=None):
+        if options is None:
+            options = {}
+
+        parameter_name = 'order_by'
+
+        if not parameter_name in options:
+            return obj_list
+
+        if hasattr(options, 'getlist'):
+            order_bits = options.getlist(parameter_name)
+        else:
+            order_bits = options.get(parameter_name)
+
+            if not isinstance(order_bits, (list, tuple)):
+                order_bits = [order_bits]
+
+        # Reverse so we can sort by the least significant key first
+        order_bits.reverse()
+
+        for order_by in order_bits:
+            field_name = order_by
+            reverse = False
+
+            if field_name.startswith('-'):
+                field_name = field_name[1:]
+                reverse = True
+
+            if not field_name in self.fields:
+                # It's not a field we know about. Move along citizen.
+                raise InvalidSortError("No matching '%s' field for ordering on." % field_name)
+
+            # If the ordering list is empty assume everything is good
+            if self._meta.ordering and not field_name in self._meta.ordering:
+                raise InvalidSortError("The '%s' field does not allow ordering." % field_name)
+
+            if self.fields[field_name].attribute is None:
+                raise InvalidSortError("The '%s' field has no 'attribute' for ordering with." % field_name)
+
+            obj_list = sorted(obj_list, key=attrgetter(field_name), reverse=reverse)
+
+        return obj_list
 
 
 # Circular import
