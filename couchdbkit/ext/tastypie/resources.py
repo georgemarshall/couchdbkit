@@ -109,8 +109,9 @@ class DocumentResource(Resource):
         if not cls._meta.object_class:
             return final_fields
 
+        # TODO: Are these fields needed, since resource_uri handles the object?
         # final_fields['id'] = CharField(attribute='_id', readonly=True)
-        # final_fields['rev'] = CharField(attribute='_rev')
+        # final_fields['rev'] = CharField(attribute='_rev', readonly=True)
         for f in cls._meta.object_class._properties.values():
             # If the field name is already present, skip
             if f.name in cls.base_fields:
