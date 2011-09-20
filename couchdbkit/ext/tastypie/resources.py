@@ -2,11 +2,15 @@ from __future__ import absolute_import
 from operator import attrgetter
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
+from django.http import QueryDict
 from tastypie.bundle import Bundle
-from tastypie.exceptions import BadRequest, NotFound, InvalidSortError
+from tastypie.constants import ALL, ALL_WITH_RELATIONS
+from tastypie.exceptions import BadRequest, NotFound, InvalidFilterError, InvalidSortError
 from tastypie.fields import (CharField, DateTimeField, BooleanField,
 FloatField, DecimalField, IntegerField, TimeField, ListField, DictField)
 from tastypie.resources import Resource, DeclarativeMetaclass
+from tastypie.utils import dict_strip_unicode_keys
 
 from ...exceptions import ResourceNotFound
 from ..django.schema import Document
@@ -145,11 +149,18 @@ class DocumentResource(Resource):
         return self._meta.object_class.view(self._meta.view, include_docs=self._meta.include_docs)
 
     def obj_get_list(self, request=None, **kwargs):
-        try:
-            queryset = self.get_object_list(request)
-            return self.apply_authorization_limits(request, queryset.all())
-        except ResourceNotFound:
-            raise BadRequest('Invalid resource lookup data provided (mismatched type).')
+        filters = QueryDict('')
+
+        if hasattr(request, 'GET'):
+            # Grab a mutable copy.
+            filters = request.GET.copy()
+
+        # Update with the provided kwargs.
+        filters.update(kwargs)
+        applicable_filters = self.build_filters(filters=filters)
+
+        base_object_list = self.apply_filters(request, applicable_filters)
+        return self.apply_authorization_limits(request, base_object_list)
 
     def obj_get(self, request=None, **kwargs):
         # Use the view as a filter, so that we can't get object that don't belong to the view
@@ -178,7 +189,7 @@ class DocumentResource(Resource):
     #         authed_object_list = self.apply_authorization_limits(request, queryset.all())
     #     except ResourceNotFound:
     #         raise BadRequest('Invalid resource lookup data provided (mismatched type).')
-    # 
+    #
     #     if hasattr(authed_object_list, 'delete'):
     #         # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
     #         authed_object_list.delete()
@@ -219,16 +230,116 @@ class DocumentResource(Resource):
 
         return self._build_reverse_url("api_dispatch_detail", kwargs=kwargs)
 
-    # def build_filters(self, filters=None):
-    #     """
-    #     Allows for the filtering of applicable objects.
-    # 
-    #     This needs to be implemented at the user level.'
-    # 
-    #     ``ModelResource`` includes a full working version specific to Django's
-    #     ``Models``.
-    #     """
-    #     return filters
+    def check_filtering(self, field_name, filter_type='exact', filter_bits=None):
+        if filter_bits is None:
+            filter_bits = []
+
+        if not field_name in self._meta.filtering:
+            raise InvalidFilterError("The '%s' field does not allow filtering." % field_name)
+
+        # Check to see if it's an allowed lookup type.
+        if not self._meta.filtering[field_name] in (ALL, ALL_WITH_RELATIONS):
+            # Must be an explicit whitelist.
+            if not filter_type in self._meta.filtering[field_name]:
+                raise InvalidFilterError("'%s' is not an allowed filter on the '%s' field." % (filter_type, field_name))
+
+        if self.fields[field_name].attribute is None:
+            raise InvalidFilterError("The '%s' field has no 'attribute' for searching with." % field_name)
+
+        # Check to see if it's a relational lookup and if that's allowed.
+        if len(filter_bits):
+            if not getattr(self.fields[field_name], 'is_related', False):
+                raise InvalidFilterError("The '%s' field does not support relations." % field_name)
+
+            if not self._meta.filtering[field_name] == ALL_WITH_RELATIONS:
+                raise InvalidFilterError("Lookups are not allowed more than one level deep on the '%s' field." % field_name)
+
+            # Recursively descend through the remaining lookups in the filter,
+            # if any. We should ensure that all along the way, we're allowed
+            # to filter on that field by the related resource.
+            related_resource = self.fields[field_name].get_related_resource(None)
+            return [self.fields[field_name].attribute] + related_resource.check_filtering(filter_bits[0], filter_type, filter_bits[1:])
+
+        return [self.fields[field_name].attribute]
+
+    def apply_filters(self, request, applicable_filters):
+        try:
+            queryset = self.get_object_list(request)
+            result = queryset.all()
+
+            for attr, filt in applicable_filters.iteritems():
+                filters = {
+                    'exact': lambda x: getattr(x, attr) == filt['value'],
+                    'iexact': lambda x: getattr(x, attr).lower() == filt['value'].lower(),
+                    'contains': lambda x: filt['value'] in getattr(x, attr),
+                    'icontains': lambda x: filt['value'].lower() in getattr(x, attr).lower(),
+                    # 'in': lambda x: filt['value'] in getattr(x, attr),  # TODO: implament this
+                    'gt': lambda x: getattr(x, attr) > filt['value'],
+                    'gte': lambda x: getattr(x, attr) >= filt['value'],
+                    'lt': lambda x: getattr(x, attr) < filt['value'],
+                    'lte': lambda x: getattr(x, attr) <= filt['value'],
+                    'startswith': lambda x: getattr(x, attr).startswith(filt['value']),
+                    'istartswith': lambda x: getattr(x, attr).lower().startswith(filt['value'].lower()),
+                    'endswith': lambda x: getattr(x, attr).endswith(filt['value']),
+                    'iendswith': lambda x: getattr(x, attr).lower().endswith(filt['value'].lower()),
+                    # 'range': lambda x: None,
+                    'year': lambda x: getattr(x, attr).year == filt['value'],
+                    'month': lambda x: getattr(x, attr).month == filt['value'],
+                    'day': lambda x: getattr(x, attr).day == filt['value'],
+                    'week_day': lambda x: getattr(x, attr).weekday() == filt['value'],
+                    'isnull': lambda x: getattr(x, attr) is None if filt['value'] else getattr(x, attr) is not None,
+                    # 'search': lambda x: None,
+                    # 'regex': lambda x: None,
+                    # 'iregex': lambda x: None,
+                }
+                result = filter(filters[filt['filter_type']], result)
+            return result
+        except ResourceNotFound:
+            raise BadRequest('Invalid resource lookup data provided (mismatched type).')
+
+    def build_filters(self, filters=None):
+        if filters is None:
+            filters = {}
+
+        qs_filters = {}
+
+        for filter_expr, value in filters.items():
+            filter_bits = filter_expr.split(LOOKUP_SEP)
+            field_name = filter_bits.pop(0)
+            filter_type = 'exact'
+
+            if not field_name in self.fields:
+                # It's not a field we know about. Move along citizen.
+                continue
+
+            if len(filter_bits) and filter_bits[-1] in QUERY_TERMS.keys():
+                filter_type = filter_bits.pop()
+
+            lookup_bits = self.check_filtering(field_name, filter_type, filter_bits)
+
+            # 'isalnum', 'isalpha', 'isdecimal', 'isdigit', 'islower', 'isnumeric', 'isspace', 'istitle', 'isupper'
+            if value.lower() in ('true', 'yes'):
+                value = True
+            elif value.lower() in ('false', 'no'):
+                value = False
+            elif value.lower() in ('nil', 'none', 'null'):
+                value = None
+            elif value.isnumeric():
+                value = int(value)
+
+            # Split on ',' if not empty string and either an in or range filter.
+            if filter_type in ('in', 'range') and len(value):
+                if hasattr(filters, 'getlist'):
+                    value = filters.getlist(filter_expr)
+                else:
+                    value = value.split(',')
+
+            qs_filters[field_name] = {
+                'filter_type': filter_type,
+                'value': value
+            }
+
+        return dict_strip_unicode_keys(qs_filters)
 
     def apply_sorting(self, obj_list, options=None):
         if options is None:
