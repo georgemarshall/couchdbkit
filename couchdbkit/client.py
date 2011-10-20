@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -
+# -*- coding: utf-8 -*-
 #
 # This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
@@ -26,9 +26,7 @@ Example:
     >>> del server['simplecouchdb_test']
 
 """
-
-UNKOWN_INFO = {}
-
+from __future__ import absolute_import
 
 from collections import deque
 from itertools import groupby
@@ -38,13 +36,16 @@ import time
 from restkit import BasicAuth
 from restkit.util import url_quote
 
-from .exceptions import InvalidAttachment, NoResultFound, \
-ResourceNotFound, ResourceConflict, BulkSaveError, MultipleResultsFound
 from . import resource
+from .exceptions import (
+    InvalidAttachment, NoResultFound, ResourceNotFound, ResourceConflict,
+    BulkSaveError, MultipleResultsFound
+)
 from .utils import validate_dbname
 
-
 DEFAULT_UUID_BATCH_COUNT = 1000
+UNKOWN_INFO = {}
+
 
 def _maybe_serialize(doc):
     if hasattr(doc, "to_json"):
@@ -60,9 +61,11 @@ def _maybe_serialize(doc):
 
     return doc, False
 
+
 class Server(object):
-    """ Server object that allows you to access and manage a couchdb node.
-    A Server object can be used like any `dict` object.
+    """
+    Server object that allows you to access and manage a couchdb node. A
+    Server object can be used like any `dict` object.
     """
 
     resource_class = resource.CouchdbResource
@@ -71,8 +74,8 @@ class Server(object):
             uuid_batch_count=DEFAULT_UUID_BATCH_COUNT,
             resource_class=None, resource_instance=None,
             **client_opts):
-
-        """ constructor for Server object
+        """
+        Constructor for Server object
 
         @param uri: uri of CouchDb host
         @param uuid_batch_count: max of uuids to get in one time
@@ -244,6 +247,7 @@ class Server(object):
         dbname = url_quote(dbname, safe=":")
         return "/".join([self.uri, dbname])
 
+
 class Database(object):
     """ Object that abstract access to a CouchDB database
     A Database object can act as a Dict object.
@@ -276,7 +280,6 @@ class Database(object):
             except ResourceNotFound:
                 self.server.res.put('/%s/' % self.dbname, **params).json_body
 
-
         self.res = server.res(self.dbname)
 
     def __repr__(self):
@@ -289,7 +292,6 @@ class Database(object):
         @return: dict
         """
         return self.res.get().json_body
-
 
     def compact(self, dname=None):
         """ compact database
@@ -313,7 +315,7 @@ class Database(object):
         except design docs."""
         # save ddocs
         all_ddocs = self.all_docs(startkey="_design",
-                            endkey="_design/"+u"\u9999",
+                            endkey="_design/" + u"\u9999",
                             include_docs=True)
         ddocs = []
         for ddoc in all_ddocs:
@@ -479,23 +481,22 @@ class Database(object):
             except ResourceConflict:
                 if force_update:
                     doc1['_rev'] = self.get_rev(docid)
-                    res =self.res.put(docid1, payload=doc1,
+                    res = self.res.put(docid1, payload=doc1,
                             **params).json_body
                 else:
                     raise
         else:
             try:
                 doc['_id'] = self.server.next_uuid()
-                res =  self.res.put(doc['_id'], payload=doc1,
+                res = self.res.put(doc['_id'], payload=doc1,
                         **params).json_body
             except:
                 res = self.res.post(payload=doc1, **params).json_body
 
         if 'batch' in params and 'id' in res:
-            doc1.update({ '_id': res['id']})
+            doc1.update({'_id': res['id']})
         else:
             doc1.update({'_id': res['id'], '_rev': res['rev']})
-
 
         if schema:
             doc._doc = doc1
@@ -539,7 +540,7 @@ class Database(object):
                 if nextid:
                     doc['_id'] = nextid
 
-        payload = { "docs": docs1 }
+        payload = {"docs": docs1}
         if all_or_nothing:
             payload["all_or_nothing"] = True
 
@@ -609,7 +610,7 @@ class Database(object):
 
             {"ok":true,"rev":"2839830636"}
         """
-        result = { 'ok': False }
+        result = {'ok': False}
 
         doc1, schema = _maybe_serialize(doc)
         if isinstance(doc1, dict):
@@ -618,7 +619,7 @@ class Database(object):
 
             docid = resource.escape_docid(doc1['_id'])
             result = self.res.delete(docid, rev=doc1['_rev'], **params).json_body
-        elif isinstance(doc1, basestring): # we get a docid
+        elif isinstance(doc1, basestring):  # we get a docid
             rev = self.get_rev(doc1)
             docid = resource.escape_docid(doc1)
             result = self.res.delete(docid, rev=rev, **params).json_body
@@ -671,8 +672,7 @@ class Database(object):
             result = self.res.copy('/%s' % docid, headers=headers).json_body
             return result
 
-        return { 'ok': False }
-
+        return {'ok': False}
 
     def view(self, view_name, schema=None, wrapper=None, **params):
         """ get view results from database. viewname is generally
@@ -761,7 +761,7 @@ class Database(object):
             wrapper = schema.wrap
         return TempView(self, design, wrapper=wrapper)(**params)
 
-    def search( self, view_name, handler='_fti/_design', wrapper=None, **params):
+    def search(self, view_name, handler='_fti/_design', wrapper=None, **params):
         """ Search. Return results from search. Use couchdb-lucene
         with its default settings by default."""
         return View(self, "/%s/%s" % (handler, view_name), wrapper=wrapper)(**params)
@@ -860,7 +860,6 @@ class Database(object):
             doc.update(new_doc)
         return res['ok']
 
-
     def fetch_attachment(self, id_or_doc, name, stream=False,
             headers=None):
         """ get attachment in a document
@@ -885,9 +884,10 @@ class Database(object):
             return resp.body_stream()
         return resp.body_string(charset="utf-8")
 
-
     def ensure_full_commit(self):
-        """ commit all docs in memory """
+        """
+        Commit all docs in memory
+        """
         return self.res.post('_ensure_full_commit', headers={
             "Content-Type": "application/json"
         }).json_body
@@ -905,15 +905,15 @@ class Database(object):
         doc['_id'] = docid
         self.save_doc(doc)
 
-
     def __delitem__(self, docid):
-       self.delete_doc(docid)
+        self.delete_doc(docid)
 
     def __iter__(self):
         return self.documents().iterator()
 
     def __nonzero__(self):
         return (len(self) > 0)
+
 
 class ViewResults(object):
     """
@@ -1008,9 +1008,10 @@ class ViewResults(object):
                 self._dynamic_keys.append(key)
                 setattr(self, key, self._result_cache[key])
 
-
     def fetch_raw(self):
-        """ retrive the raw result """
+        """
+        Retrive the raw result
+        """
         return self.view._exec(**self.params)
 
     def _fetch_if_needed(self):
@@ -1019,7 +1020,9 @@ class ViewResults(object):
 
     @property
     def total_rows(self):
-        """ return number of total rows in the view """
+        """
+        Return number of total rows in the view
+        """
         self._fetch_if_needed()
         # reduce case, count number of lines
         if self._total_rows is None:
@@ -1072,6 +1075,7 @@ class ViewInterface(object):
     def _exec(self, **params):
         raise NotImplementedError
 
+
 class View(ViewInterface):
     """ Object used to wrap a view and return ViewResults.
     Generally called via the `view` method in a `Database` instance. """
@@ -1083,9 +1087,10 @@ class View(ViewInterface):
     def _exec(self, **params):
         if 'keys' in params:
             keys = params.pop('keys')
-            return self._db.res.post(self.view_path, payload={ 'keys': keys }, **params)
+            return self._db.res.post(self.view_path, payload={'keys': keys}, **params)
         else:
             return self._db.res.get(self.view_path, **params)
+
 
 class TempView(ViewInterface):
     """ Object used to wrap a temporary and return ViewResults. """
