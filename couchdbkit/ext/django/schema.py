@@ -14,35 +14,42 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-""" Wrapper of couchdbkit Document and Properties for django. It also
-add possibility to a document to register itself in CouchdbkitHandler
+"""
+Wrapper of couchdbkit Document and Properties for django. It also add
+possibility to a document to register itself in CouchdbkitHandler
 """
 import re
 import sys
 
 from django.conf import settings
 from django.db.models.options import get_verbose_name
-from django.utils.translation import activate, deactivate_all, get_language, \
-string_concat
+from django.utils.translation import (
+    activate, deactivate_all, get_language, string_concat
+)
 from django.utils.encoding import smart_str, force_unicode
 
-from couchdbkit import schema
-from couchdbkit.ext.django.loading import get_schema, register_schema, \
-get_db
+from ... import schema
+from ...schema import (
+    DocumentSchema, Property, StringProperty, IntegerProperty,
+    DecimalProperty, BooleanProperty, FloatProperty, DateTimeProperty,
+    DateProperty, TimeProperty, SchemaProperty, SchemaListProperty,
+    ListProperty, DictProperty, StringListProperty, SchemaDictProperty,
+    SetProperty, dict_to_json, list_to_json, value_to_json, value_to_python,
+    dict_to_python, list_to_python, convert_property
+)
+from .loading import get_schema, register_schema, get_db
 
-__all__ = ['Property', 'StringProperty', 'IntegerProperty',
-            'DecimalProperty', 'BooleanProperty', 'FloatProperty',
-            'DateTimeProperty', 'DateProperty', 'TimeProperty',
-            'dict_to_json', 'list_to_json', 'value_to_json',
-            'value_to_python', 'dict_to_python', 'list_to_python',
-            'convert_property', 'DocumentSchema', 'Document',
-            'SchemaProperty', 'SchemaListProperty', 'ListProperty',
-            'DictProperty', 'StringListProperty', 'SchemaDictProperty',
-            'SetProperty',]
+__all__ = (
+    'Property', 'StringProperty', 'IntegerProperty', 'DecimalProperty',
+    'BooleanProperty', 'FloatProperty', 'DateTimeProperty', 'DateProperty',
+    'TimeProperty', 'dict_to_json', 'list_to_json', 'value_to_json',
+    'value_to_python', 'dict_to_python', 'list_to_python', 'convert_property',
+    'DocumentSchema', 'Document', 'SchemaProperty', 'SchemaListProperty',
+    'ListProperty', 'DictProperty', 'StringListProperty',
+    'SchemaDictProperty', 'SetProperty'
+)
+DEFAULT_NAMES = ('verbose_name', 'db_table', 'ordering', 'app_label')
 
-
-DEFAULT_NAMES = ('verbose_name', 'db_table', 'ordering',
-                 'app_label')
 
 class Options(object):
     """ class based on django.db.models.options. We only keep
@@ -105,6 +112,7 @@ class Options(object):
         return raw
     verbose_name_raw = property(verbose_name_raw)
 
+
 class DocumentMeta(schema.SchemaProperties):
     def __new__(cls, name, bases, attrs):
         super_new = super(DocumentMeta, cls).__new__
@@ -126,7 +134,6 @@ class DocumentMeta(schema.SchemaProperties):
             app_label = getattr(meta, 'app_label')
 
         new_class.add_to_class('_meta', Options(meta, app_label=app_label))
-
         register_schema(app_label, new_class)
 
         return get_schema(app_label, name)
@@ -137,12 +144,17 @@ class DocumentMeta(schema.SchemaProperties):
         else:
             setattr(cls, name, value)
 
-class Document(schema.Document):
-    """ Document object for django extension """
-    __metaclass__ = DocumentMeta
 
+class DjangoMixin(schema.Document):
     get_id = property(lambda self: self['_id'])
     get_rev = property(lambda self: self['_rev'])
+
+    def __init__(self, *args, **kwargs):
+        setattr(self, '_doc_type', (
+            self._meta.app_label,
+            self._meta.module_name
+        ))
+        super(DjangoMixin, self).__init__(*args, **kwargs)
 
     @classmethod
     def get_db(cls):
@@ -154,38 +166,15 @@ class Document(schema.Document):
         return db
 
 
-class StaticDocument(Document):
+class Document(DjangoMixin):
+    """
+    Document object for django extension.
+    """
+    __metaclass__ = DocumentMeta
+
+
+class StaticDocument(schema.StaticDocument, DjangoMixin):
     """
     Shorthand for a document that disallow dynamic properties.
     """
-    _allow_dynamic_properties = False
-
-
-DocumentSchema = schema.DocumentSchema
-
-#  properties
-Property = schema.Property
-StringProperty = schema.StringProperty
-IntegerProperty = schema.IntegerProperty
-DecimalProperty = schema.DecimalProperty
-BooleanProperty = schema.BooleanProperty
-FloatProperty = schema.FloatProperty
-DateTimeProperty = schema.DateTimeProperty
-DateProperty = schema.DateProperty
-TimeProperty = schema.TimeProperty
-SchemaProperty = schema.SchemaProperty
-SchemaListProperty = schema.SchemaListProperty
-ListProperty = schema.ListProperty
-DictProperty = schema.DictProperty
-StringListProperty = schema.StringListProperty
-SchemaDictProperty = schema.SchemaDictProperty
-SetProperty = schema.SetProperty
-
-# some utilities
-dict_to_json = schema.dict_to_json
-list_to_json = schema.list_to_json
-value_to_json = schema.value_to_json
-value_to_python = schema.value_to_python
-dict_to_python = schema.dict_to_python
-list_to_python = schema.list_to_python
-convert_property = schema.convert_property
+    __metaclass__ = DocumentMeta
