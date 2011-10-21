@@ -23,8 +23,8 @@ import sys
 import os
 
 from restkit import BasicAuth
-from couchdbkit import Server
-from couchdbkit import push
+from couchdbkit import Server, Database
+from couchdbkit import push, resource
 from couchdbkit.resource import CouchdbResource
 from couchdbkit.exceptions import ResourceNotFound
 from django.conf import settings
@@ -32,6 +32,7 @@ from django.utils.datastructures import SortedDict
 
 COUCHDB_DATABASES = getattr(settings, "COUCHDB_DATABASES", [])
 COUCHDB_TIMEOUT = getattr(settings, "COUCHDB_TIMEOUT", 300)
+
 
 class CouchdbkitHandler(object):
     """ The couchdbkit handler for django """
@@ -164,13 +165,13 @@ class CouchdbkitHandler(object):
         if register:
             return
 
-        db = self._databases[app_label]
+        db = self._databases.get(app_label)
         if isinstance(db, tuple):
             server, dbname = db
             db = server.get_or_create_db(dbname)
             self._databases[app_label] = db
         return db
-                
+
     def register_schema(self, app_label, *schema):
         """ register a Document object"""
         for s in schema:
@@ -186,8 +187,53 @@ class CouchdbkitHandler(object):
     def get_schema(self, app_label, schema_name):
         """ retriev Document object from its name and app name """
         return self.app_schema.get(app_label, SortedDict()).get(schema_name.lower())
-        
+
 couchdbkit_handler = CouchdbkitHandler(COUCHDB_DATABASES)
 register_schema = couchdbkit_handler.register_schema
 get_schema = couchdbkit_handler.get_schema
 get_db = couchdbkit_handler.get_db
+
+
+def open_doc(self, docid, **params):
+    """Get document from database
+
+    Args:
+    @param docid: str, document id to retrieve
+    @param wrapper: callable. function that takes dict as a param.
+    Used to wrap an object.
+    @param **params: See doc api for parameters to use:
+    http://wiki.apache.org/couchdb/HTTP_Document_API
+
+    @return: dict, representation of CouchDB document as
+     a dict.
+    """
+    wrapper = None
+    if 'wrapper' in params:
+        wrapper = params.pop('wrapper')
+    elif 'schema' in params:
+        schema = params.pop('schema')
+        if not hasattr(schema, 'wrap'):
+            raise TypeError("invalid schema")
+        wrapper = schema.wrap
+
+    docid = resource.escape_docid(docid)
+    doc = self.res.get(docid, **params).json_body
+
+    # Lookup to see if doc_type is registered in schema
+    try:
+        schema = couchdbkit_handler.get_schema(*doc['doc_type'])
+    except TypeError:
+        pass
+    else:
+        if schema:
+            wrapper = schema.wrap
+
+    if wrapper is not None:
+        if not callable(wrapper):
+            raise TypeError("wrapper isn't a callable")
+        return wrapper(doc)
+    return doc
+
+# Monkey patch Database with our Django only functionality
+Database.open_doc = open_doc
+Database.get = open_doc
