@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from operator import attrgetter
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.urlresolvers import reverse
 from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
 from django.http import QueryDict
 from tastypie.bundle import Bundle
@@ -18,10 +19,8 @@ from ..django.schema import Document
 
 class DocumentDeclarativeMetaclass(DeclarativeMetaclass):
     def __new__(cls, name, bases, attrs):
-        # meta = attrs.get('Meta')
-
         new_class = super(DocumentDeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
-        fields = getattr(new_class._meta, 'fields', [])
+        include_fields = getattr(new_class._meta, 'fields', [])
         excludes = getattr(new_class._meta, 'excludes', [])
         field_names = new_class.base_fields.keys()
 
@@ -34,13 +33,13 @@ class DocumentDeclarativeMetaclass(DeclarativeMetaclass):
                 continue
             if field_name in new_class.declared_fields:
                 continue
-            if len(fields) and not field_name in fields:
+            if len(include_fields) and not field_name in include_fields:
                 del(new_class.base_fields[field_name])
             if len(excludes) and field_name in excludes:
                 del(new_class.base_fields[field_name])
 
         # Add in the new fields.
-        new_class.base_fields.update(new_class.get_fields(fields, excludes))
+        new_class.base_fields.update(new_class.get_fields(include_fields, excludes))
 
         if getattr(new_class._meta, 'include_absolute_url', True):
             if not 'absolute_url' in new_class.base_fields:
@@ -383,6 +382,15 @@ class DocumentResource(Resource):
             obj_list = sorted(obj_list, key=attrgetter(field_name), reverse=reverse)
 
         return obj_list
+
+
+class NamespacedDocumentResource(DocumentResource):
+    """
+    A DocumentResource subclass that respects Django namespaces.
+    """
+    def _build_reverse_url(self, name, args=None, kwargs=None):
+        namespaced = "%s:%s" % (self._meta.urlconf_namespace, name)
+        return reverse(namespaced, args=args, kwargs=kwargs)
 
 
 # Circular import

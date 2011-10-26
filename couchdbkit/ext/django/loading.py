@@ -231,7 +231,9 @@ def open_doc(self, docid, **params):
     if wrapper is not None:
         if not callable(wrapper):
             raise TypeError("wrapper isn't a callable")
-        return wrapper(doc)
+        doc = wrapper(doc)
+        doc._db = self
+        return doc
     return doc
 
 # Monkey patch Database with our Django only functionality
