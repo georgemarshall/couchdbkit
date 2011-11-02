@@ -38,23 +38,23 @@ class ClientServerTestCase(unittest.TestCase):
         all_dbs = self.Server.all_dbs()
         self.assertIn('couchdbkit_test', all_dbs)
         del self.Server['couchdbkit_test']
-        res = self.Server.create_db("couchdbkit/test")
+        res = self.Server.create_db('couchdbkit/test')
         self.assertIn('couchdbkit/test', self.Server.all_dbs())
         del self.Server['couchdbkit/test']
 
     def testGetOrCreateDb(self):
         # create the database
-        gocdb = self.Server.get_or_create_db("get_or_create_db")
-        self.assertEqual(gocdb.dbname, "get_or_create_db")
+        gocdb = self.Server.get_or_create_db('get_or_create_db')
+        self.assertEqual(gocdb.dbname, 'get_or_create_db')
         self.assertIn('get_or_create_db', self.Server)
-        self.Server.delete_db("get_or_create_db")
+        self.Server.delete_db('get_or_create_db')
         # get the database (already created)
-        self.assertFalse("get_or_create_db" in self.Server)
-        db = self.Server.create_db("get_or_create_db")
-        self.assertIn("get_or_create_db", self.Server)
-        gocdb = self.Server.get_or_create_db("get_or_create_db")
+        self.assertNotIn('get_or_create_db', self.Server)
+        db = self.Server.create_db('get_or_create_db')
+        self.assertIn('get_or_create_db', self.Server)
+        gocdb = self.Server.get_or_create_db('get_or_create_db')
         self.assertEqual(db.dbname, gocdb.dbname)
-        self.Server.delete_db("get_or_create_db")
+        self.Server.delete_db('get_or_create_db')
 
     def testCreateInvalidDbName(self):
 
@@ -104,11 +104,11 @@ class ClientDatabaseTestCase(unittest.TestCase):
     def testDbFromUri(self):
         db = self.Server.create_db('couchdbkit_test')
 
-        db1 = Database("http://127.0.0.1:5984/couchdbkit_test")
-        self.assertIs(hasattr(db1, "dbname"), True)
-        self.assertEqual(db1.dbname, "couchdbkit_test")
+        db1 = Database('http://127.0.0.1:5984/couchdbkit_test')
+        self.assertIs(hasattr(db1, 'dbname'), True)
+        self.assertEqual(db1.dbname, 'couchdbkit_test')
         info = db1.info()
-        self.assertEqual(info['db_name'], "couchdbkit_test")
+        self.assertEqual(info['db_name'], 'couchdbkit_test')
 
     def testCreateEmptyDoc(self):
         db = self.Server.create_db('couchdbkit_test')
@@ -154,10 +154,10 @@ class ClientDatabaseTestCase(unittest.TestCase):
         db.save_doc(doc)
         self.assertIn('a/b', db)
 
-        doc = {'_id': "http://a"}
+        doc = {'_id': 'http://a'}
         db.save_doc(doc)
         self.assertIn('http://a', db)
-        doc = db.get("http://a")
+        doc = db.get('http://a')
         self.assertIsNotNone(doc)
 
         def not_found():
@@ -201,13 +201,13 @@ class ClientDatabaseTestCase(unittest.TestCase):
 
     def testMultipleDocWithSlashes(self):
         db = self.Server.create_db('couchdbkit_test')
-        doc = {'_id': "a/b"}
-        doc1 = {'_id': "http://a"}
+        doc = {'_id': 'a/b'}
+        doc1 = {'_id': 'http://a'}
         doc3 = {'_id': '_design/a'}
         db.bulk_save([doc, doc1, doc3])
-        self.assertIn("a/b", db)
-        self.assertIn("http://a", db)
-        self.assertIn("_design/a", db)
+        self.assertIn('a/b', db)
+        self.assertIn('http://a', db)
+        self.assertIn('_design/a', db)
 
         def not_found():
             doc = db.get('http:%2F%2Fa')
@@ -226,7 +226,7 @@ class ClientDatabaseTestCase(unittest.TestCase):
             'language': 'javascript',
             'views': {
                 'all': {
-                    "map": """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
+                    'map': """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
             }}"""
                 }
             }
@@ -238,7 +238,7 @@ class ClientDatabaseTestCase(unittest.TestCase):
         self.assertFalse(db.doc_exist('test'))
         self.assertFalse(db.doc_exist('test2'))
         self.assertTrue(db.doc_exist('_design/test'))
-        ddoc = db.get("_design/test")
+        ddoc = db.get('_design/test')
         self.assertIn('all', ddoc['views'])
         del self.Server['couchdbkit_test']
 
@@ -279,21 +279,21 @@ class ClientDatabaseTestCase(unittest.TestCase):
 
     def testInlineAttachments(self):
         db = self.Server.create_db('couchdbkit_test')
-        attachment = "<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>"
+        attachment = '<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>'
         doc = {
-            '_id': "docwithattachment",
-            "f": "value",
-            "_attachments": {
-                "test.html": {
-                    "type": "text/html",
-                    "data": attachment
+            '_id': 'docwithattachment',
+            'f': 'value',
+            '_attachments': {
+                'test.html': {
+                    'type': 'text/html',
+                    'data': attachment
                 }
             }
         }
         db.save_doc(doc)
-        fetch_attachment = db.fetch_attachment(doc, "test.html")
+        fetch_attachment = db.fetch_attachment(doc, 'test.html')
         self.assertEqual(attachment, fetch_attachment)
-        doc1 = db.get("docwithattachment")
+        doc1 = db.get('docwithattachment')
         self.assertIn('_attachments', doc1)
         self.assertIn('test.html', doc1['_attachments'])
         self.assertIn('stub', doc1['_attachments']['test.html'])
@@ -303,30 +303,30 @@ class ClientDatabaseTestCase(unittest.TestCase):
 
     def testMultipleInlineAttachments(self):
         db = self.Server.create_db('couchdbkit_test')
-        attachment = "<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>"
-        attachment2 = "<html><head><title>test attachment</title></head><body><p>More words</p></body></html>"
+        attachment = '<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>'
+        attachment2 = '<html><head><title>test attachment</title></head><body><p>More words</p></body></html>'
         doc = {
-            '_id': "docwithattachment",
-            "f": "value",
-            "_attachments": {
-                "test.html": {
-                    "type": "text/html",
-                    "data": attachment
+            '_id': 'docwithattachment',
+            'f': 'value',
+            '_attachments': {
+                'test.html': {
+                    'type': 'text/html',
+                    'data': attachment
                 },
-                "test2.html": {
-                    "type": "text/html",
-                    "data": attachment2
+                'test2.html': {
+                    'type': 'text/html',
+                    'data': attachment2
                 }
             }
         }
 
         db.save_doc(doc)
-        fetch_attachment = db.fetch_attachment(doc, "test.html")
+        fetch_attachment = db.fetch_attachment(doc, 'test.html')
         self.assertEqual(attachment, fetch_attachment)
-        fetch_attachment = db.fetch_attachment(doc, "test2.html")
+        fetch_attachment = db.fetch_attachment(doc, 'test2.html')
         self.assertEqual(attachment2, fetch_attachment)
 
-        doc1 = db.get("docwithattachment")
+        doc1 = db.get('docwithattachment')
         self.assertIn('test.html', doc1['_attachments'])
         self.assertIn('test2.html', doc1['_attachments'])
         self.assertEqual(len(attachment), doc1['_attachments']['test.html']['length'])
@@ -335,32 +335,32 @@ class ClientDatabaseTestCase(unittest.TestCase):
 
     def testInlineAttachmentWithStub(self):
         db = self.Server.create_db('couchdbkit_test')
-        attachment = "<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>"
-        attachment2 = "<html><head><title>test attachment</title></head><body><p>More words</p></body></html>"
+        attachment = '<html><head><title>test attachment</title></head><body><p>Some words</p></body></html>'
+        attachment2 = '<html><head><title>test attachment</title></head><body><p>More words</p></body></html>'
         doc = {
-            '_id': "docwithattachment",
-            "f": "value",
-            "_attachments": {
-                "test.html": {
-                    "type": "text/html",
-                    "data": attachment
+            '_id': 'docwithattachment',
+            'f': 'value',
+            '_attachments': {
+                'test.html': {
+                    'type': 'text/html',
+                    'data': attachment
                 }
             }
         }
         db.save_doc(doc)
-        doc1 = db.get("docwithattachment")
-        doc1["_attachments"].update({
-            "test2.html": {
-                "type": "text/html",
-                "data": attachment2
+        doc1 = db.get('docwithattachment')
+        doc1['_attachments'].update({
+            'test2.html': {
+                'type': 'text/html',
+                'data': attachment2
             }
         })
         db.save_doc(doc1)
 
-        fetch_attachment = db.fetch_attachment(doc1, "test2.html")
+        fetch_attachment = db.fetch_attachment(doc1, 'test2.html')
         self.assertEqual(attachment2, fetch_attachment)
 
-        doc2 = db.get("docwithattachment")
+        doc2 = db.get('docwithattachment')
         self.assertIn('test.html', doc2['_attachments'])
         self.assertIn('test2.html', doc2['_attachments'])
         self.assertEqual(len(attachment), doc2['_attachments']['test.html']['length'])
@@ -371,11 +371,11 @@ class ClientDatabaseTestCase(unittest.TestCase):
         db = self.Server.create_db('couchdbkit_test')
         doc = {'string': 'test', 'number': 4}
         db.save_doc(doc)
-        text_attachment = u"un texte attaché"
+        text_attachment = u'un texte attaché'
         old_rev = doc['_rev']
-        db.put_attachment(doc, text_attachment, "test", "text/plain")
+        db.put_attachment(doc, text_attachment, 'test', 'text/plain')
         self.assertNotEqual(old_rev, doc['_rev'])
-        fetch_attachment = db.fetch_attachment(doc, "test")
+        fetch_attachment = db.fetch_attachment(doc, 'test')
         self.assertEqual(text_attachment, fetch_attachment)
         del self.Server['couchdbkit_test']
 
@@ -383,9 +383,9 @@ class ClientDatabaseTestCase(unittest.TestCase):
         db = self.Server.create_db('couchdbkit_test')
         doc = {'string': 'test', 'number': 4}
         db.save_doc(doc)
-        text_attachment = u"a text attachment"
-        db.put_attachment(doc, text_attachment, "test", "text/plain")
-        stream = db.fetch_attachment(doc, "test", stream=True)
+        text_attachment = u'a text attachment'
+        db.put_attachment(doc, text_attachment, 'test', 'text/plain')
+        stream = db.fetch_attachment(doc, 'test', stream=True)
         fetch_attachment = stream.read()
         self.assertEqual(text_attachment, fetch_attachment)
         del self.Server['couchdbkit_test']
@@ -394,7 +394,7 @@ class ClientDatabaseTestCase(unittest.TestCase):
         db = self.Server.create_db('couchdbkit_test')
         doc = {}
         db.save_doc(doc)
-        db.put_attachment(doc, "", name="test")
+        db.put_attachment(doc, '', name='test')
         doc1 = db.get(doc['_id'])
         attachment = doc1['_attachments']['test']
         self.assertEqual(0, attachment['length'])
@@ -405,9 +405,9 @@ class ClientDatabaseTestCase(unittest.TestCase):
         doc = {'string': 'test', 'number': 4}
         db.save_doc(doc)
 
-        text_attachment = "un texte attaché"
+        text_attachment = 'un texte attaché'
         old_rev = doc['_rev']
-        db.put_attachment(doc, text_attachment, "test", "text/plain")
+        db.put_attachment(doc, text_attachment, 'test', 'text/plain')
         db.delete_attachment(doc, 'test')
         self.assertRaises(ResourceNotFound, db.fetch_attachment, doc, 'test')
         del self.Server['couchdbkit_test']
@@ -416,29 +416,29 @@ class ClientDatabaseTestCase(unittest.TestCase):
         db = self.Server.create_db('couchdbkit_test')
         doc = {'_id': 'test/slashes', 'string': 'test', 'number': 4}
         db.save_doc(doc)
-        text_attachment = u"un texte attaché"
+        text_attachment = u'un texte attaché'
         old_rev = doc['_rev']
-        db.put_attachment(doc, text_attachment, "test", "text/plain")
+        db.put_attachment(doc, text_attachment, 'test', 'text/plain')
         self.assertNotEqual(old_rev, doc['_rev'])
-        fetch_attachment = db.fetch_attachment(doc, "test")
+        fetch_attachment = db.fetch_attachment(doc, 'test')
         self.assertEqual(text_attachment, fetch_attachment)
 
-        db.put_attachment(doc, text_attachment, "test/test.txt", "text/plain")
+        db.put_attachment(doc, text_attachment, 'test/test.txt', 'text/plain')
         self.assertNotEqual(old_rev, doc['_rev'])
-        fetch_attachment = db.fetch_attachment(doc, "test/test.txt")
+        fetch_attachment = db.fetch_attachment(doc, 'test/test.txt')
         self.assertEqual(text_attachment, fetch_attachment)
 
         del self.Server['couchdbkit_test']
 
     def testAttachmentUnicode8URI(self):
         db = self.Server.create_db('couchdbkit_test')
-        doc = {'_id': u"éàù/slashes", 'string': 'test', 'number': 4}
+        doc = {'_id': u'éàù/slashes', 'string': 'test', 'number': 4}
         db.save_doc(doc)
-        text_attachment = u"un texte attaché"
+        text_attachment = u'un texte attaché'
         old_rev = doc['_rev']
-        db.put_attachment(doc, text_attachment, "test", "text/plain")
+        db.put_attachment(doc, text_attachment, 'test', 'text/plain')
         self.assertNotEqual(old_rev, doc['_rev'])
-        fetch_attachment = db.fetch_attachment(doc, "test")
+        fetch_attachment = db.fetch_attachment(doc, 'test')
         self.assertEqual(text_attachment, fetch_attachment)
         del self.Server['couchdbkit_test']
 
@@ -545,31 +545,31 @@ class ClientDatabaseTestCase(unittest.TestCase):
 
     def testCopy(self):
         db = self.Server.create_db('couchdbkit_test')
-        doc = {"f": "a"}
+        doc = {'f': 'a'}
         db.save_doc(doc)
 
-        db.copy_doc(doc['_id'], "test")
-        self.assertIn("test", db)
-        doc1 = db.get("test")
+        db.copy_doc(doc['_id'], 'test')
+        self.assertIn('test', db)
+        doc1 = db.get('test')
         self.assertIn('f', doc1)
-        self.assertEqual(doc1['f'], "a")
+        self.assertEqual(doc1['f'], 'a')
 
-        db.copy_doc(doc, "test2")
-        self.assertIn("test2", db)
+        db.copy_doc(doc, 'test2')
+        self.assertIn('test2', db)
 
-        doc2 = {"_id": "test3", "f": "c"}
+        doc2 = {'_id': 'test3', 'f': 'c'}
         db.save_doc(doc2)
 
         db.copy_doc(doc, doc2)
-        self.assertIn("test3", db)
-        doc3 = db.get("test3")
-        self.assertEqual(doc3['f'], "a")
+        self.assertIn('test3', db)
+        doc3 = db.get('test3')
+        self.assertEqual(doc3['f'], 'a')
 
-        doc4 = {"_id": "test5", "f": "c"}
+        doc4 = {'_id': 'test5', 'f': 'c'}
         db.save_doc(doc4)
-        db.copy_doc(doc, "test6")
-        doc6 = db.get("test6")
-        self.assertEqual(doc6['f'], "a")
+        db.copy_doc(doc, 'test6')
+        doc6 = db.get('test6')
+        self.assertEqual(doc6['f'], 'a')
 
         del self.Server['couchdbkit_test']
 
@@ -605,7 +605,7 @@ class ClientViewTestCase(unittest.TestCase):
             'language': 'javascript',
             'views': {
                 'all': {
-                    "map": """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
+                    'map': """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
 }}"""
                 }
             }
@@ -648,7 +648,7 @@ class ClientViewTestCase(unittest.TestCase):
             'language': 'javascript',
             'views': {
                 'all': {
-                    "map": """function(doc) { if (doc.docType == "test") { emit(doc._id, doc); }}"""
+                    'map': """function(doc) { if (doc.docType == "test") { emit(doc._id, doc); }}"""
                 }
             }
         }
@@ -668,7 +668,7 @@ class ClientViewTestCase(unittest.TestCase):
         db.save_doc(doc2)
 
         design_doc = {
-            "map": """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
+            'map': """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
 }}"""
         }
 
@@ -693,11 +693,11 @@ class ClientViewTestCase(unittest.TestCase):
             'language': 'javascript',
             'views': {
                 'with_test': {
-                    "map": """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
+                    'map': """function(doc) { if (doc.docType == "test") { emit(doc._id, doc);
 }}"""
                 },
                 'with_test2': {
-                    "map": """function(doc) { if (doc.docType == "test2") { emit(doc._id, doc);
+                    'map': """function(doc) { if (doc.docType == "test2") { emit(doc._id, doc);
 }}"""
                 }
 
@@ -739,16 +739,16 @@ class ClientViewTestCase(unittest.TestCase):
             'language': 'javascript',
             'views': {
                 'test1': {
-                    "map": """function(doc) { if (doc.docType == "test")
+                    'map': """function(doc) { if (doc.docType == "test")
                     { emit(doc.string, doc);
 }}"""
                 },
                 'test2': {
-                    "map": """function(doc) { if (doc.docType == "test") { emit(doc.date, doc);
+                    'map': """function(doc) { if (doc.docType == "test") { emit(doc.date, doc);
 }}"""
                 },
                 'test3': {
-                    "map": """function(doc) { if (doc.docType == "test")
+                    'map': """function(doc) { if (doc.docType == "test")
                     { emit(doc.string, doc);
 }}"""
                 }
@@ -761,17 +761,16 @@ class ClientViewTestCase(unittest.TestCase):
         results = db.view('test/test1')
         self.assertEqual(len(results), 6)
 
-        results = db.view('test/test3', key="test")
+        results = db.view('test/test3', key='test')
         self.assertEqual(len(results), 2)
 
-        results = db.view('test/test3', key="test2")
+        results = db.view('test/test3', key='test2')
         self.assertEqual(len(results), 3)
 
-        results = db.view('test/test2', startkey="200811")
+        results = db.view('test/test2', startkey='200811')
         self.assertEqual(len(results), 5)
 
-        results = db.view('test/test2', startkey="20081107",
-                endkey="20081108")
+        results = db.view('test/test2', startkey='20081107', endkey='20081108')
         self.assertEqual(len(results), 3)
 
         results = db.view('test/test1', keys=['test', 'machin'])
