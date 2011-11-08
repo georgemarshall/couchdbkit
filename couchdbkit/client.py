@@ -31,15 +31,18 @@ from __future__ import absolute_import
 from collections import deque
 from itertools import groupby
 from mimetypes import guess_type
+from urlparse import urlparse, ParseResult
 import time
+import urllib
 
 from restkit import BasicAuth
 from restkit.util import url_quote
+from restkit.errors import RequestFailed
 
 from . import resource
 from .exceptions import (
     InvalidAttachment, NoResultFound, ResourceNotFound, ResourceConflict,
-    BulkSaveError, MultipleResultsFound
+    BulkSaveError, MultipleResultsFound, PreconditionFailed
 )
 from .utils import validate_dbname
 
@@ -67,11 +70,11 @@ class Server(object):
     Server object that allows you to access and manage a couchdb node. A
     Server object can be used like any `dict` object.
     """
-
+    database_class = Database
     resource_class = resource.CouchdbResource
+    uuid_batch_count = DEFAULT_UUID_BATCH_COUNT
 
-    def __init__(self, uri={'URL': 'http://127.0.0.1:5984'},
-            uuid_batch_count=DEFAULT_UUID_BATCH_COUNT,
+    def __init__(self, url='http://127.0.0.1:5984/',
             resource_class=None, resource_instance=None,
             **client_opts):
         """
@@ -82,68 +85,88 @@ class Server(object):
         @param resource_instance: `restkit.resource.CouchdbDBResource` instance.
             It alows you to set a resource class with custom parameters.
         """
+        if not isinstance(url, basestring):
+            raise ValueError('Server uri is missing')
+        self.url = urlparse(url)
         filters = []
 
-        if isinstance(uri, dict):
-            uri_settings = uri  # Change the refrence to the dict
+        # if isinstance(uri, dict):
+        #     uri_settings = uri  # Change the refrence to the dict
 
-            uri = uri_settings['URL']
-            # Blank credentials are valid for the admin party
-            user = uri_settings.get('USER', '')
-            password = uri_settings.get('PASSWORD', '')
+        #     uri = uri_settings['URL']
+        #     # Blank credentials are valid for the admin party
+        #     user = uri_settings.get('USER', '')
+        #     password = uri_settings.get('PASSWORD', '')
 
-            filters.append(BasicAuth(user, password))
+        #     filters.append(BasicAuth(user, password))
 
-        if not uri or uri is None:
-            raise ValueError("Server uri is missing")
+        # if not uri or uri is None:
+        #     raise ValueError("Server uri is missing")
 
-        if uri.endswith("/"):
-            uri = uri[:-1]
+        # if uri.endswith("/"):
+        #     uri = uri[:-1]
 
-        self.uri = uri
-        self.uuid_batch_count = uuid_batch_count
-        self._uuid_batch_count = uuid_batch_count
+        # self.uri = uri
+        url_dict = self.url._asdict()
+        url_dict.update(fragment='', params='', query='', path='')
 
         if resource_class is not None:
             self.resource_class = resource_class
 
-        if resource_instance and isinstance(resource_instance,
-                                resource.CouchdbResource):
-            resource_instance.initial['uri'] = uri
-            self.res = resource_instance.clone()
+        if resource_instance and isinstance(resource_instance, resource.CouchdbResource):
+            resource_instance.initial['uri'] = ParseResult(**url_dict).geturl()
+            self.resource = resource_instance.clone()
             if client_opts:
                 self.res.client_opts.update(client_opts)
         else:
-            self.res = self.resource_class(uri, filters=filters, **client_opts)
+            self.resource = self.resource_class(ParseResult(**url_dict).geturl(), filters=filters, **client_opts)
+        # self.res = self.resource
         self._uuids = deque()
+
+    # def __contains__(self, dbname):
+    #     try:
+    #         self.res.head('/%s/' % url_quote(dbname, safe=":"))
+    #     except:
+    #         return False
+    #     return True
+    # 
+    # def __iter__(self):
+    #     for dbname in self.all_dbs():
+    #         yield Database(self._db_uri(dbname), server=self)
+    # 
+    # def __len__(self):
+    #     return len(self.all_dbs())
+    # 
+    # def __nonzero__(self):
+    #     return (len(self) > 0)
 
     def info(self):
         """ info of server
 
         @return: dict
-
         """
         try:
-            resp = self.res.get()
+            return self.resource.get().json_body
         except Exception:
             return UNKOWN_INFO
 
-        return resp.json_body
-
     def all_dbs(self):
-        """ get list of databases in CouchDb host
-
         """
-        return self.res.get('/_all_dbs').json_body
+        Get a list of databases in CouchDb host
+        """
+        return self.resource.get('_all_dbs').json_body
 
-    def get_db(self, dbname, **params):
+    def get_db(self, name, **params):
         """
         Try to return a Database object for dbname.
 
         """
-        return Database(self._db_uri(dbname), server=self, **params)
+        try:
+            return database_class(self, name, **params)
+        except ResourceNotFound:
+            return None
 
-    def create_db(self, dbname, **params):
+    def create_db(self, name, **params):
         """ Create a database on CouchDb host
 
         @param dname: str, name of db
@@ -156,20 +179,33 @@ class Server(object):
 
         @return: Database instance if it's ok or dict message
         """
-        return self.get_db(dbname, create=True, **params)
+        validate_dbname(name)
+        try:
+            self.resource.put(urllib.quote_plus(name), **params)
+        except PreconditionFailed:
+            return False
+        else:
+            return True
 
-    get_or_create_db = create_db
-    get_or_create_db.__doc__ = """
+    def get_or_create_db(self, name, **params):
+        """
         Try to return a Database object for dbname. If
         database doest't exist, it will be created.
 
         """
+        self.create_db(name, **params)
+        return database_class(self, name, **params)
 
-    def delete_db(self, dbname):
+    def delete_db(self, name, **params):
         """
         Delete database
         """
-        del self[dbname]
+        try:
+            self.resource.delete(urllib.quote_plus(name), **params)
+        except ResourceNotFound:
+            return False
+        else:
+            return True
 
     #TODO: maintain list of replications
     def replicate(self, source, target, **params):
@@ -185,105 +221,73 @@ class Server(object):
 
         """
         payload = {
-            "source": source,
-            "target": target,
+            'source': source.resource.uri if isinstance(source, Database) else source,
+            'target': target.resource.uri if isinstance(target, Database) else target,
         }
         payload.update(params)
-        resp = self.res.post('/_replicate', payload=payload)
-        return resp.json_body
+        try:
+            self.resource.post('_replicate', payload=payload, **params).json_body 
+        except ResourceNotFound:
+            return False
+        else:
+            return True
 
     def active_tasks(self):
-        """ return active tasks """
-        resp = self.res.get('/_active_tasks')
+        """
+        Return active tasks
+        """
+        resp = self.resource.get('_active_tasks')
         return resp.json_body
 
     def uuids(self, count=1):
-        return self.res.get('/_uuids', count=count).json_body
+        return self.resource.get('_uuids', count=count).json_body
 
-    def next_uuid(self, count=None):
+    def next_uuid(self):
         """
         return an available uuid from couchdbkit
         """
-        if count is not None:
-            self._uuid_batch_count = count
-        else:
-            self._uuid_batch_count = self.uuid_batch_count
-
         try:
             return self._uuids.pop()
         except IndexError:
-            self._uuids.extend(self.uuids(count=self._uuid_batch_count)["uuids"])
+            self._uuids.extend(self.uuids(count=self.uuid_batch_count)['uuids'])
             return self._uuids.pop()
-
-    def __getitem__(self, dbname):
-        return Database(self._db_uri(dbname), server=self)
-
-    def __delitem__(self, dbname):
-        ret = self.res.delete('/%s/' % url_quote(dbname,
-            safe=":")).json_body
-        return ret
-
-    def __contains__(self, dbname):
-        try:
-            self.res.head('/%s/' % url_quote(dbname, safe=":"))
-        except:
-            return False
-        return True
-
-    def __iter__(self):
-        for dbname in self.all_dbs():
-            yield Database(self._db_uri(dbname), server=self)
-
-    def __len__(self):
-        return len(self.all_dbs())
-
-    def __nonzero__(self):
-        return (len(self) > 0)
-
-    def _db_uri(self, dbname):
-        if dbname.startswith("/"):
-            dbname = dbname[1:]
-
-        dbname = url_quote(dbname, safe=":")
-        return "/".join([self.uri, dbname])
 
 
 class Database(object):
-    """ Object that abstract access to a CouchDB database
+    """
+    Object that abstract access to a CouchDB database
     A Database object can act as a Dict object.
     """
-
-    def __init__(self, uri, create=False, server=None, **params):
-        """Constructor for Database
+    def __init__(self, server, name, **params):
+        """
+        Constructor for Database
 
         @param uri: str, Database uri
-        @param create: boolean, False by default,
-        if True try to create the database.
         @param server: Server instance
-
         """
-        self.uri = uri
-        self.server_uri, self.dbname = uri.rsplit("/", 1)
+        if not isinstance(server, Server):
+            raise TypeError('%s is not a couchdbkit.Server instance' % server.__class__.__name__)
 
-        if server is not None:
-            if not hasattr(server, 'next_uuid'):
-                raise TypeError('%s is not a couchdbkit.Server instance' %
-                            server.__class__.__name__)
-            self.server = server
-        else:
-            self.server = server = Server(self.server_uri, **params)
+        # TODO: Add URL parsing and server init
+        self.name = name
+        self.server = server
 
-        validate_dbname(self.dbname)
-        if create:
-            try:
-                self.server.res.head('/%s/' % self.dbname)
-            except ResourceNotFound:
-                self.server.res.put('/%s/' % self.dbname, **params).json_body
-
-        self.res = server.res(self.dbname)
+        self.resource.head()
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.dbname)
+        return '<%s %s>' % (self.__class__.__name__, self.name)
+
+    @property
+    def name(self):
+        return urllib.unquote_plus(self._name)
+
+    @name.setter
+    def name(self, v):
+        self._name = urllib.quote_plus(v)
+
+    @property
+    def resource(self):
+        return self.server.resource(self._name)
 
     def info(self):
         """
@@ -291,7 +295,7 @@ class Database(object):
 
         @return: dict
         """
-        return self.res.get().json_body
+        return self.server.resource.get(self._db_name)
 
     def compact(self, dname=None):
         """ compact database
@@ -447,8 +451,7 @@ class Database(object):
         response = self.res.head(resource.escape_docid(docid))
         return response['etag'].strip('"')
 
-    def save_doc(self, doc, encode_attachments=True, force_update=False,
-            **params):
+    def save_doc(self, doc, encode_attachments=True, force_update=False, **params):
         """ Save a document. It will use the `_id` member of the document
         or request a new uuid from CouchDB. IDs are attached to
         documents on the client side because POST has the curious property of
@@ -476,22 +479,20 @@ class Database(object):
             docid = doc1['_id']
             docid1 = resource.escape_docid(doc1['_id'])
             try:
-                res = self.res.put(docid1, payload=doc1,
-                        **params).json_body
+                res = self.resource.put(docid1, payload=doc1, **params).json_body
             except ResourceConflict:
                 if force_update:
                     doc1['_rev'] = self.get_rev(docid)
-                    res = self.res.put(docid1, payload=doc1,
-                            **params).json_body
+                    res = self.resource.put(docid1, payload=doc1, **params).json_body
                 else:
                     raise
         else:
             try:
                 doc['_id'] = self.server.next_uuid()
-                res = self.res.put(doc['_id'], payload=doc1,
+                res = self.resource.put(doc['_id'], payload=doc1,
                         **params).json_body
             except:
-                res = self.res.post(payload=doc1, **params).json_body
+                res = self.resource.post(payload=doc1, **params).json_body
 
         if 'batch' in params and 'id' in res:
             doc1.update({'_id': res['id']})
@@ -504,8 +505,7 @@ class Database(object):
             doc.update(doc1)
         return res
 
-    def save_docs(self, docs, use_uuids=True, all_or_nothing=False,
-            **params):
+    def save_docs(self, docs, use_uuids=True, all_or_nothing=False, **params):
         """ bulk save. Modify Multiple Documents With a Single Request
 
         @param docs: list of docs
@@ -568,8 +568,7 @@ class Database(object):
         return results
     bulk_save = save_docs
 
-    def delete_docs(self, docs, all_or_nothing=False,
-            empty_on_delete=False, **params):
+    def delete_docs(self, docs, all_or_nothing=False, empty_on_delete=False, **params):
         """ bulk delete.
         It adds '_deleted' member to doc then uses bulk_save to save them.
 
