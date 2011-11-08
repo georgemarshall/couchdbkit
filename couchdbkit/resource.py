@@ -22,7 +22,7 @@ Example:
 import base64
 import re
 
-from restkit import Resource, ClientResponse
+from restkit import Resource, Response
 from restkit.errors import ResourceError, RequestFailed, RequestError
 from restkit.util import url_quote
   
@@ -35,17 +35,35 @@ USER_AGENT = 'couchdbkit/%s' % __version__
 
 RequestFailed = RequestFailed
 
-class CouchDBResponse(ClientResponse):
-    
+
+class JSONResponse(Response):
+    def json_body(self, *args, **kwargs):
+        body = self.body_string(*args, **kwargs)
+        # print self.headers.get('Content-Type')
+        return body
+
+
+class JSONResponse(Response):
     @property
     def json_body(self):
-        body = self.body_string()
+        """
+        Automaticly deserializes JSON to python
+        """
+        content_type = self.headers.get('Content-Type')
+        if content_type != 'application/json':
+            raise TypeError('%s is not a valid content type.' % content_type)
+
+        if not self.can_read():
+            raise AlreadyRead()
 
         # try to decode json
-        try:
-            return json.loads(body)
-        except ValueError:
-            return body 
+        body = json.load(self._body)
+        self._already_read = True
+
+        # release connection
+        self.connection.release(self.should_close)
+
+        return body
 
 
 class CouchdbResource(Resource):
@@ -57,7 +75,7 @@ class CouchdbResource(Resource):
 
         @param uri: str, full uri to the server.
         """
-        client_opts['response_class'] = CouchDBResponse
+        client_opts['response_class'] = JSONResponse
         
         Resource.__init__(self, uri=uri, **client_opts)
         self.safe = ":/%"
@@ -107,9 +125,7 @@ class CouchdbResource(Resource):
 
         params = encode_params(params)
         try:
-            resp = Resource.request(self, method, path=path,
-                             payload=payload, headers=headers, **params)
-                             
+            resp = Resource.request(self, method, path=path, payload=payload, headers=headers, **params)
         except ResourceError, e:
             msg = getattr(e, 'msg', '')
             if e.response and msg:
@@ -118,27 +134,23 @@ class CouchdbResource(Resource):
                         msg = json.loads(msg)
                     except ValueError:
                         pass
-                    
+
             if type(msg) is dict:
                 error = msg.get('reason')
             else:
                 error = msg
-                
-            if e.status_int == 404:
-                raise ResourceNotFound(error, http_code=404,
-                        response=e.response)
 
+            if e.status_int == 404:
+                raise ResourceNotFound(error, http_code=404, response=e.response)
             elif e.status_int == 409:
-                raise ResourceConflict(error, http_code=409,
-                        response=e.response)
+                raise ResourceConflict(error, http_code=409, response=e.response)
             elif e.status_int == 412:
-                raise PreconditionFailed(error, http_code=412,
-                        response=e.response)
+                raise PreconditionFailed(error, http_code=412, response=e.response)
             else:
                 raise
-        except: 
-            raise 
-        
+        except:
+            raise
+
         return resp
 
 def encode_params(params):
