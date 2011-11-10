@@ -2,7 +2,6 @@
 #
 # This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-
 """
 Client implementation for CouchDB access. It allows you to manage a CouchDB
 server, databases, documents and views. All objects mostly reflect python

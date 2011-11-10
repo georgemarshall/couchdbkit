@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# This file is part of couchdbkit released under the MIT license. 
+# This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-
 """
 Macros used by loaders. compatible with couchapp. It allow you to include code,
 design docs members inside your views, shows and lists.

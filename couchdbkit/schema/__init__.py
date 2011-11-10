@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -
+# -*- coding: utf-8 -*-
 #
-# This file is part of couchdbkit released under the MIT license. 
+# This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-
 """ Schema is an easy way to map couchdb object in pythoin object. It's
 similar to ORMs but with all couchdb glory.
 

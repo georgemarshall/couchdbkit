@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -
+# -*- coding: utf-8 -*-
 #
-# This file is part of couchdbkit released under the MIT license. 
+# This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-
 """ module that provides a Document object that allows you
 to map CouchDB document in Python statically, dynamically or both
 """

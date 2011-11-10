@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -
+# -*- coding: utf-8 -*-
 #
-# This file is part of couchdbkit released under the MIT license. 
+# This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-
-
 """
 Mostly utility functions couchdbkit uses internally that don't
 really belong anywhere else in the modules.
