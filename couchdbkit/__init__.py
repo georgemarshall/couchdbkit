@@ -6,7 +6,8 @@ from __future__ import absolute_import
 import logging
 
 from .version import version_info, __version__
-from .client import Server, Database, ViewResults, View, TempView
+from .client import Server
+from .bucket import Database, ViewResults, View, TempView
 from .consumer import Consumer
 from .designer import document, push, pushdocs, pushapps, clone
 from .exceptions import (
@@ -19,13 +20,12 @@ from .external import External
 from .loaders import BaseDocsLoader, FileSystemDocsLoader
 from .resource import  RequestFailed, CouchdbResource
 from .schema import (
-    Property, Property, IntegerProperty, DecimalProperty, BooleanProperty,
-    FloatProperty, DateTimeProperty, DateProperty, TimeProperty,
-    dict_to_json, dict_to_json, dict_to_json, value_to_python,
-    dict_to_python, DocumentSchema, DocumentBase, Document, StaticDocument,
-    QueryMixin, AttachmentMixin, SchemaProperty, SchemaListProperty,
-    SchemaDictProperty, ListProperty, DictProperty, StringListProperty,
-    contain, StringProperty, SetProperty
+    Property, IntegerProperty, DecimalProperty, BooleanProperty,
+    FloatProperty, DateTimeProperty, DateProperty, TimeProperty, dict_to_json,
+    value_to_python, dict_to_python, DocumentSchema, DocumentBase, Document,
+    StaticDocument, QueryMixin, AttachmentMixin, SchemaProperty,
+    SchemaListProperty, SchemaDictProperty, ListProperty, DictProperty,
+    StringListProperty, contain, StringProperty, SetProperty
 )
 
 LOG_LEVELS = {

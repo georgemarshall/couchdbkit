@@ -20,26 +20,31 @@ class CouchDbKitTestSuiteRunner(DjangoTestSuiteRunner):
     """
 
     dbs = []
+    test_prefix = 'test_'
 
-    def get_test_db_name(self, dbname):
-        return "%s_test" % dbname
+    # def get_test_db_name(self, dbname):
+    #     return "test_%s" % dbname
 
     def setup_databases(self, **kwargs):
         print "overridding the couchdbkit database settings to use a test database!"
 
         # first pass: just implement this as a monkey-patch to the loading module
         # overriding all the existing couchdb settings
-        self.dbs = [(app, self.get_test_db_name(url)) for app, url in getattr(settings, "COUCHDB_DATABASES", [])]
         old_handler = loading.couchdbkit_handler
-        couchdbkit_handler = loading.CouchdbkitHandler(self.dbs)
-        loading.couchdbkit_handler = couchdbkit_handler
-        loading.register_schema = couchdbkit_handler.register_schema
-        loading.get_schema = couchdbkit_handler.get_schema
-        loading.get_db = couchdbkit_handler.get_db
+        old_handler._databases = dict(
+            (key, (value[0], self.test_prefix +value[1]))
+        for key, value in old_handler._databases.iteritems())
+        # self.dbs = [(app, self.get_test_db_name(url)) for app, url in getattr(settings, "COUCHDB_DATABASES", [])]
+        # couchdbkit_handler = loading.CouchdbkitHandler([])
+        # loading.couchdbkit_handler = couchdbkit_handler
+        # loading.register_schema = couchdbkit_handler.register_schema
+        # loading.get_schema = couchdbkit_handler.get_schema
+        # loading.get_db = couchdbkit_handler.get_db
 
         # register our dbs with the extension document classes
-        for app, value in old_handler.app_schema.items():
-            for name, cls in value.items():
+        # print old_handler.app_schema
+        for app, value in old_handler.app_schema.iteritems():
+            for name, cls in value.iteritems():
                 cls.set_db(loading.get_db(app))
 
         return super(CouchDbKitTestSuiteRunner, self).setup_databases(**kwargs)

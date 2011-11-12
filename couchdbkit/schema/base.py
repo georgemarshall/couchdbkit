@@ -2,11 +2,10 @@
 #
 # This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
-""" module that provides a Document object that allows you
-to map CouchDB document in Python statically, dynamically or both
 """
-
-
+Module that provides a Document object that allows you to map CouchDB
+documents in Python statically, dynamically or both
+"""
 from . import properties as p
 from .properties import value_to_python, \
 convert_property, MAP_TYPES_PROPERTIES, ALLOWED_PROPERTY_TYPES, \
@@ -35,7 +34,6 @@ def valid_id(value):
     raise TypeError('id "%s" is invalid' % value)
 
 class SchemaProperties(type):
-
     def __new__(cls, name, bases, attrs):
         # init properties
         properties = {}
@@ -58,7 +56,7 @@ class SchemaProperties(type):
 
         attrs['_doc_type'] = doc_type
 
-        for attr_name, attr in attrs.items():
+        for attr_name, attr in attrs.iteritems():
             # map properties
             if isinstance(attr, p.Property):
                 check_reserved_words(attr_name)
@@ -90,45 +88,64 @@ class DocumentSchema(object):
     _doc = None
     _db = None
 
-    def __init__(self, _d=None, **properties):
-        self._dynamic_properties = {}
+    def __init__(self, database, _id=None, **data):
+        # self._dynamic_properties = {}
+        self._database = database
         self._doc = {}
+        if _id is not None:
+            self._id = _id
 
-        if _d is not None:
-            if not isinstance(_d, dict):
-                raise TypeError('d should be a dict')
-            properties.update(_d)
+        self.__dict__.update(data)
+        # if _d is not None:
+        #     if not isinstance(_d, dict):
+        #         raise TypeError('d should be a dict')
+        #     properties.update(_d)
 
-        doc_type = getattr(self, '_doc_type', self.__class__.__name__)
-        self._doc['doc_type'] = doc_type
-        
-        for prop in self._properties.values():
-            if prop.name in properties:
-                value = properties.pop(prop.name)
-                if value is None:
-                    value = prop.default_value()
-            else:
-                value = prop.default_value()
-            prop.__property_init__(self, value)
-            self.__dict__[prop.name] = value
+        # for prop in self._properties.values():
+        #     if prop.name in properties:
+        #         value = properties.pop(prop.name)
+        #         if value is None:
+        #             value = prop.default_value()
+        #     else:
+        #         value = prop.default_value()
+        #     prop.__property_init__(self, value)
+        #     self.__dict__[prop.name] = value
 
-        _dynamic_properties = properties.copy()
-        for attr_name, value in _dynamic_properties.iteritems():
-            if attr_name not in self._properties \
-                    and value is not None:
-                if isinstance(value, p.Property):
-                    value.__property_config__(self, attr_name)
-                    value.__property_init__(self, value.default_value())
-                elif isinstance(value, DocumentSchema):
-                    from couchdbkit.schema import SchemaProperty
-                    value = SchemaProperty(value)
-                    value.__property_config__(self, attr_name)
-                    value.__property_init__(self, value.default_value())
+        # _dynamic_properties = properties.copy()
+        # for attr_name, value in _dynamic_properties.iteritems():
+        #     if attr_name not in self._properties \
+        #             and value is not None:
+        #         if isinstance(value, p.Property):
+        #             value.__property_config__(self, attr_name)
+        #             value.__property_init__(self, value.default_value())
+        #         elif isinstance(value, DocumentSchema):
+        #             from couchdbkit.schema import SchemaProperty
+        #             value = SchemaProperty(value)
+        #             value.__property_config__(self, attr_name)
+        #             value.__property_init__(self, value.default_value())
 
 
-                setattr(self, attr_name, value)
-                # remove the kwargs to speed stuff
-                del properties[attr_name]
+        #         setattr(self, attr_name, value)
+        #         # remove the kwargs to speed stuff
+        #         del properties[attr_name]
+
+    # def __str__(self):
+    #     if hasattr(self, '__unicode__'):
+    #         return unicode(self).encode('utf-8')
+    #     return '%s object' % self.__class__.__name__
+
+    # def __eq__(self, other):
+    #     return isinstance(other, self.__class__) and self._get_pk_val() == other._get_pk_val()
+
+    # def __ne__(self, other):
+    #     return not self.__eq__(other)
+
+    # def __hash__(self):
+    #     return hash(self._get_pk_val())
+
+    @property
+    def resource(self):
+        return self._database.resource(self._id)
 
     def dynamic_properties(self):
         """ get dict of dynamic properties """
@@ -163,12 +180,11 @@ class DocumentSchema(object):
         start with '_') a,d add it to `_dynamic_properties` dict. If value is
         a list or a dict we use LazyList and LazyDict to maintain in the value.
         """
-
-        if key == "_id" and valid_id(value):
+        if key == '_id' and valid_id(value):
             self._doc['_id'] = value
-        elif key == "_deleted":
-            self._doc["_deleted"] = value
-        elif key == "_attachments":
+        elif key == '_deleted':
+            self._doc['_deleted'] = value
+        elif key == '_attachments':
             if key not in self._doc or not value:
                 self._doc[key] = {}
             elif not isinstance(self._doc[key], dict):
@@ -176,12 +192,10 @@ class DocumentSchema(object):
             value = LazyDict(self._doc[key], init_vals=value)
         else:
             check_reserved_words(key)
-            if not hasattr( self, key ) and not self._allow_dynamic_properties:
+            if not hasattr(self, key) and not self._allow_dynamic_properties:
                 raise AttributeError("%s is not defined in schema (not a valid property)" % key)
-
             elif not key.startswith('_') and \
-                    key not in self.properties() and \
-                    key not in dir(self):
+                    key not in self.properties():# and key not in dir(self):
                 if type(value) not in ALLOWED_PROPERTY_TYPES and \
                         not isinstance(value, (p.Property,)):
                     raise TypeError("Document Schema cannot accept values of type '%s'." %
@@ -215,8 +229,7 @@ class DocumentSchema(object):
                 object.__setattr__(self, key, value)
 
     def __delattr__(self, key):
-        """ delete property
-        """
+        """Delete the specified property."""
         if key in self._doc:
             del self._doc[key]
 
@@ -226,11 +239,10 @@ class DocumentSchema(object):
             object.__delattr__(self, key)
 
     def __getattr__(self, key):
-        """ get property value
-        """
+        """Get the value of the specified property."""
         if self._dynamic_properties and key in self._dynamic_properties:
             return self._dynamic_properties[key]
-        elif key  in ('_id', '_rev', '_attachments', 'doc_type'):
+        elif key in ('_id', '_rev', '_attachments', 'doc_type'):
             return self._doc.get(key)
         try:
             return self.__dict__[key]
@@ -238,8 +250,7 @@ class DocumentSchema(object):
             raise AttributeError(e)
 
     def __getitem__(self, key):
-        """ get property value
-        """
+        """Get property value"""
         try:
             attr = getattr(self, key)
             if callable(attr):
@@ -303,41 +314,43 @@ class DocumentSchema(object):
         obj_dict = self.__dict__.copy()
         return obj_dict
 
-    @classmethod
-    def wrap(cls, data):
-        """ wrap `data` dict in object properties """
-        instance = cls()
-        instance._doc = data
-        for prop in instance._properties.values():
-            if prop.name in data:
-                value = data[prop.name]
-                if value is not None:
-                    value = prop.to_python(value)
-                else:
-                    value = prop.default_value()
-            else:
-                value = prop.default_value()
-            prop.__property_init__(instance, value)
+    # @classmethod
+    # def wrap(cls, data):
+    #     """ wrap `data` dict in object properties """
+    #     instance = cls()
+    #     instance._doc = data
+    #     for prop in instance._properties.values():
+    #         if prop.name in data:
+    #             value = data[prop.name]
+    #             if value is not None:
+    #                 value = prop.to_python(value)
+    #             else:
+    #                 value = prop.default_value()
+    #         else:
+    #             value = prop.default_value()
+    #         prop.__property_init__(instance, value)
+    # 
+    #     if cls._allow_dynamic_properties:
+    #         for attr_name, value in data.iteritems():
+    #             if attr_name in instance.properties():
+    #                 continue
+    #             if value is None:
+    #                 continue
+    #             elif attr_name.startswith('_'):
+    #                 continue
+    #             elif attr_name == 'doc_type':
+    #                 continue
+    #             else:
+    #                 value = value_to_python(value)
+    #                 setattr(instance, attr_name, value)
+    #     return instance
+    # from_json = wrap
 
-        if cls._allow_dynamic_properties:
-            for attr_name, value in data.iteritems():
-                if attr_name in instance.properties():
-                    continue
-                if value is None:
-                    continue
-                elif attr_name.startswith('_'):
-                    continue
-                elif attr_name == 'doc_type':
-                    continue
-                else:
-                    value = value_to_python(value)
-                    setattr(instance, attr_name, value)
-        return instance
-    from_json = wrap
-
-    def validate(self, required=True):
-        """ validate a document """
-        for attr_name, value in self._doc.items():
+    def is_valid(self, required=True):
+        """
+        Validate the document
+        """
+        for attr_name, value in self._doc.iteritems():
             if attr_name in self._properties:
                 self._properties[attr_name].validate(
                         getattr(self, attr_name), required=required)
@@ -395,16 +408,16 @@ class DocumentBase(DocumentSchema):
     """
     _db = None
 
-    def __init__(self, _d=None, **kwargs):
-        _d = _d or {}
-        
-        docid = kwargs.pop('_id', _d.pop("_id", ""))
-        docrev = kwargs.pop('_rev', _d.pop("_rev", ""))
-        
-        DocumentSchema.__init__(self, _d, **kwargs)
-        
-        if docid: self._doc['_id'] = valid_id(docid)
-        if docrev: self._doc['_rev'] = docrev            
+    # def __init__(self, _d=None, **kwargs):
+    #     _d = _d or {}
+    #     
+    #     docid = kwargs.pop('_id', _d.pop("_id", ""))
+    #     docrev = kwargs.pop('_rev', _d.pop("_rev", ""))
+    #     
+    #     DocumentSchema.__init__(self, _d, **kwargs)
+    #     
+    #     if docid: self._doc['_id'] = valid_id(docid)
+    #     if docrev: self._doc['_rev'] = docrev            
 
     @classmethod
     def set_db(cls, db):
@@ -424,15 +437,20 @@ class DocumentBase(DocumentSchema):
 
         @params db: couchdbkit.core.Database instance
         """
-        self.validate()
-        db = self.get_db()
+        self.is_valid()
+        response = self._database.resource.post(payload=self.to_json(), **params).json_body
 
-        doc = self.to_json()
-        db.save_doc(doc, **params)
-        if '_id' in doc and '_rev' in doc:
-            self._doc.update(doc)
-        elif '_id' in doc:
-            self._doc.update({'_id': doc['_id']})
+        # Get our new _id and _rev from the database
+        self._doc['_id'] = response.get('id')
+        self._doc['_rev'] = response.get('rev')
+        # db = self._db
+        # 
+        # doc = self.to_json()
+        # db.save_doc(doc, **params)
+        # if '_id' in doc and '_rev' in doc:
+        #     self._doc.update(doc)
+        # elif '_id' in doc:
+        #     self._doc.update({'_id': doc['_id']})
 
     store = save
 
