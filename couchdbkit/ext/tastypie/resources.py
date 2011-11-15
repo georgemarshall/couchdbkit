@@ -316,15 +316,23 @@ class DocumentResource(Resource):
 
             lookup_bits = self.check_filtering(field_name, filter_type, filter_bits)
 
-            # 'isalnum', 'isalpha', 'isdecimal', 'isdigit', 'islower', 'isnumeric', 'isspace', 'istitle', 'isupper'
-            if value.lower() in ('true', 'yes'):
-                value = True
-            elif value.lower() in ('false', 'no'):
-                value = False
-            elif value.lower() in ('nil', 'none', 'null'):
-                value = None
-            elif value.isnumeric():
-                value = int(value)
+            # Is the field defined in our resource?
+            field = getattr(self, field_name)
+
+            # TODO: Should we do more field checking?
+            if isinstance(value, basestring):
+                if value.lower() in ('true', 'yes'):
+                    value = True
+                elif value.lower() in ('false', 'no'):
+                    value = False
+                elif value.lower() in ('nil', 'none', 'null'):
+                    value = None
+                # elif value.isnumeric():
+                #     value = int(value)
+
+            # If we have a field defined use its type conversion
+            if field:
+                value = field.convert(value)
 
             # Split on ',' if not empty string and either an in or range filter.
             if filter_type in ('in', 'range') and len(value):
