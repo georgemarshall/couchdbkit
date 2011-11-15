@@ -237,5 +237,4 @@ def open_doc(self, docid, **params):
     return doc
 
 # Monkey patch Database with our Django only functionality
-Database.open_doc = open_doc
-Database.get = open_doc
+Database.get = Database.open_doc = open_doc
