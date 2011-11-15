@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -
 #
-# This file is part of couchdbkit released under the MIT license. 
+# This file is part of couchdbkit released under the MIT license.
 # See the NOTICE for more information.
 
 """ module that provides a Document object that allows you
 to map CouchDB document in Python statically, dynamically or both
 """
-
+from __future__ import absolute_import
 
 from . import properties as p
-from .properties import value_to_python, \
-convert_property, MAP_TYPES_PROPERTIES, ALLOWED_PROPERTY_TYPES, \
-LazyDict, LazyList
-from ..exceptions import DuplicatePropertyError, ResourceNotFound, \
-ReservedWordError 
+from .properties import (
+    value_to_python, convert_property, MAP_TYPES_PROPERTIES,
+    ALLOWED_PROPERTY_TYPES, LazyDict, LazyList
+)
+from ..exceptions import (
+    DuplicatePropertyError, ResourceNotFound, ReservedWordError
+)
 
 
 __all__ = ['ReservedWordError', 'ALLOWED_PROPERTY_TYPES', 'DocumentSchema',
@@ -102,7 +104,7 @@ class DocumentSchema(object):
 
         doc_type = getattr(self, '_doc_type', self.__class__.__name__)
         self._doc['doc_type'] = doc_type
-        
+
         for prop in self._properties.values():
             if prop.name in properties:
                 value = properties.pop(prop.name)
@@ -398,14 +400,14 @@ class DocumentBase(DocumentSchema):
 
     def __init__(self, _d=None, **kwargs):
         _d = _d or {}
-        
+
         docid = kwargs.pop('_id', _d.pop("_id", ""))
         docrev = kwargs.pop('_rev', _d.pop("_rev", ""))
-        
+
         DocumentSchema.__init__(self, _d, **kwargs)
-        
+
         if docid: self._doc['_id'] = valid_id(docid)
-        if docrev: self._doc['_rev'] = docrev            
+        if docrev: self._doc['_rev'] = docrev
 
     @classmethod
     def set_db(cls, db):
@@ -426,7 +428,7 @@ class DocumentBase(DocumentSchema):
         @params db: couchdbkit.core.Database instance
         """
         self.validate()
-        db = self.get_db()
+        db = self._db
 
         doc = self.to_json()
         db.save_doc(doc, **params)
@@ -450,7 +452,7 @@ class DocumentBase(DocumentSchema):
 
         """
         db = cls.get_db()
-        docs_to_save= [doc for doc in docs if doc._doc_type == cls._doc_type]
+        docs_to_save = [doc for doc in docs if doc._doc_type == cls._doc_type]
         if not len(docs_to_save) == len(docs):
             raise ValueError("one of your documents does not have the correct type")
         db.bulk_save(docs_to_save, use_uuids=use_uuids, all_or_nothing=all_or_nothing)
@@ -469,7 +471,7 @@ class DocumentBase(DocumentSchema):
     @classmethod
     def get_or_create(cls, docid=None, db=None, dynamic_properties=True, **params):
         """ get  or create document with `docid` """
-       
+
         if db:
             cls.set_db(db)
         cls._allow_dynamic_properties = dynamic_properties
@@ -498,9 +500,9 @@ class DocumentBase(DocumentSchema):
         """
         if self.new_document:
             raise TypeError("the document is not saved")
-        
-        db = self.get_db()
-        
+
+        db = self._db
+
         # delete doc
         db.delete_doc(self._id)
 
@@ -526,7 +528,7 @@ class AttachmentMixin(object):
 
         @return: bool, True if everything was ok.
         """
-        db = self.get_db() 
+        db = self._db
         return db.put_attachment(self._doc, content, name=name,
             content_type=content_type, content_length=content_length)
 
@@ -538,7 +540,7 @@ class AttachmentMixin(object):
         @return: dict, with member ok set to True if delete was ok.
         """
 
-        db = self.get_db()
+        db = self._db
         result = db.delete_attachment(self._doc, name)
         try:
             self._doc['_attachments'].pop(name)
@@ -555,7 +557,7 @@ class AttachmentMixin(object):
 
         @return: str or unicode, attachment
         """
-        db = self.get_db()
+        db = self._db
         return db.fetch_attachment(self._doc, name, stream=stream)
 
 
