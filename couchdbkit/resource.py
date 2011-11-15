@@ -37,13 +37,6 @@ RequestFailed = RequestFailed
 
 
 class JSONResponse(Response):
-    def json_body(self, *args, **kwargs):
-        body = self.body_string(*args, **kwargs)
-        # print self.headers.get('Content-Type')
-        return body
-
-
-class JSONResponse(Response):
     @property
     def json_body(self):
         """
