@@ -91,7 +91,6 @@ class DocumentSchema(object):
     _dynamic_properties = None
     _allow_dynamic_properties = True
     _doc = None
-    _db = None
 
     def __init__(self, _d=None, **properties):
         self._dynamic_properties = {}
@@ -101,9 +100,6 @@ class DocumentSchema(object):
             if not isinstance(_d, dict):
                 raise TypeError('d should be a dict')
             properties.update(_d)
-
-        doc_type = getattr(self, '_doc_type', self.__class__.__name__)
-        self._doc['doc_type'] = doc_type
 
         for prop in self._properties.values():
             if prop.name in properties:
@@ -152,9 +148,6 @@ class DocumentSchema(object):
         return all_properties
 
     def to_json(self):
-        if self._doc.get('doc_type') is None:
-            doc_type = getattr(self, '_doc_type', self.__class__.__name__)
-            self._doc['doc_type'] = doc_type
         return self._doc
 
     #TODO: add a way to maintain custom dynamic properties
@@ -406,6 +399,9 @@ class DocumentBase(DocumentSchema):
 
         DocumentSchema.__init__(self, _d, **kwargs)
 
+        doc_type = getattr(self, '_doc_type', self.__class__.__name__)
+        self._doc['doc_type'] = doc_type
+
         if docid: self._doc['_id'] = valid_id(docid)
         if docrev: self._doc['_rev'] = docrev
 
@@ -421,6 +417,13 @@ class DocumentBase(DocumentSchema):
         if db is None:
             raise TypeError("doc database required to save document")
         return db
+
+    def to_json(self):
+        super(DocumentBase, self).to_json()
+        if self._doc.get('doc_type') is None:
+            doc_type = getattr(self, '_doc_type', self.__class__.__name__)
+            self._doc['doc_type'] = doc_type
+        return self._doc
 
     def save(self, **params):
         """ Save document in database.
@@ -472,7 +475,7 @@ class DocumentBase(DocumentSchema):
     def get_or_create(cls, docid=None, db=None, dynamic_properties=True, **params):
         """ get  or create document with `docid` """
 
-        if db:
+        if db is not None:
             cls.set_db(db)
         cls._allow_dynamic_properties = dynamic_properties
         db = cls.get_db()

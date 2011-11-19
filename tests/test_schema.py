@@ -859,7 +859,7 @@ class PropertyTestCase(unittest.TestCase):
 
     def testSchemaBuild(self):
         schema = DocumentSchema(i = IntegerProperty())
-        C = DocumentSchema.build(**schema._dynamic_properties)
+        C = DocumentBase.build(**schema._dynamic_properties)
         self.assert_('i' in C._properties)
         self.assert_(isinstance(C.i, IntegerProperty))
 
@@ -870,7 +870,7 @@ class PropertyTestCase(unittest.TestCase):
 
 
         schema2 = DocumentSchema(i = IntegerProperty(default=-1))
-        C3 = DocumentSchema.build(**schema2._dynamic_properties)
+        C3 = DocumentBase.build(**schema2._dynamic_properties)
         c3 = C3()
 
         self.assert_(c3._doc == {'doc_type': 'AnonymousSchema', 'i':
@@ -895,7 +895,7 @@ class PropertyTestCase(unittest.TestCase):
    
     def testDynamicSchemaProperty(self):
         from datetime import datetime
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         a = A(s="foo")
@@ -945,7 +945,7 @@ class PropertyTestCase(unittest.TestCase):
 
     def testStaticSchemaProperty(self):
         from datetime import datetime
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -972,7 +972,7 @@ class PropertyTestCase(unittest.TestCase):
         self.assert_(b2.sm.s != b.sm.s)
         
     def testSchemaListProperty(self):
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1000,7 +1000,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertySlice(self):
         """SchemaListProperty slice methods
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1074,7 +1074,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertyExtend(self):
         """SchemaListProperty extend method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1124,7 +1124,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertyInsert(self):
         """SchemaListProperty insert method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1153,7 +1153,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertyPop(self):
         """SchemaListProperty pop method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1189,7 +1189,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertyRemove(self):
         """SchemaListProperty remove method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1216,7 +1216,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertyReverse(self):
         """SchemaListProperty reverse method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1240,7 +1240,7 @@ class PropertyTestCase(unittest.TestCase):
     def testSchemaListPropertySort(self):
         """SchemaListProperty sort method
         """
-        class A(DocumentSchema):
+        class A(DocumentBase):
             s = StringProperty()
             
         class B(Document):
@@ -1276,7 +1276,7 @@ class PropertyTestCase(unittest.TestCase):
 
 
     def testSchemaDictProperty(self):
-        class A(DocumentSchema):
+        class A(DocumentBase):
             i = IntegerProperty()
 
         class B(Document):
