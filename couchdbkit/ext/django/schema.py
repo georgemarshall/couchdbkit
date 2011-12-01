@@ -146,7 +146,7 @@ class DocumentMeta(schema.SchemaProperties):
 
 
 class DjangoMixin(schema.Document):
-    get_id = property(lambda self: self['_id'])
+    pk = get_id = property(lambda self: self['_id'])
     get_rev = property(lambda self: self['_rev'])
 
     def __init__(self, *args, **kwargs):

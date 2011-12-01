@@ -5,6 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.db.models.sql.constants import QUERY_TERMS, LOOKUP_SEP
 from django.http import QueryDict
+from tastypie import http
 from tastypie.bundle import Bundle
 from tastypie.constants import ALL, ALL_WITH_RELATIONS
 from tastypie.exceptions import BadRequest, NotFound, InvalidFilterError, InvalidSortError
@@ -84,6 +85,7 @@ class DocumentResource(Resource):
             result = DecimalField
         elif type == 'IntegerProperty':
             result = IntegerField
+        # TODO: Add support for attachments
         # elif type in ('FileField', 'ImageField'):
         #     result = FileField
         elif type == 'TimeProperty':
@@ -112,9 +114,8 @@ class DocumentResource(Resource):
         if not cls._meta.object_class:
             return final_fields
 
-        # TODO: Are these fields needed, since resource_uri handles the object?
-        # final_fields['id'] = CharField(attribute='_id', readonly=True)
-        # final_fields['rev'] = CharField(attribute='_rev', readonly=True)
+        final_fields['_id'] = CharField(attribute='_id', readonly=True)
+        # final_fields['_rev'] = CharField(attribute='_rev', readonly=True)
         for f in cls._meta.object_class._properties.values():
             # If the field name is already present, skip
             if f.name in cls.base_fields:
@@ -182,32 +183,55 @@ class DocumentResource(Resource):
 
         return bundle
 
-    # def obj_delete_list(self, request=None, **kwargs):
-    #     try:
-    #         queryset = self.get_object_list(request)
-    #         authed_object_list = self.apply_authorization_limits(request, queryset.all())
-    #     except ResourceNotFound:
-    #         raise BadRequest('Invalid resource lookup data provided (mismatched type).')
-    #
-    #     if hasattr(authed_object_list, 'delete'):
-    #         # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
-    #         authed_object_list.delete()
-    #     else:
-    #         for authed_obj in authed_object_list:
-    #             authed_obj.delete()
+    def obj_update(self, bundle, request=None, **kwargs):
+        """
+        A ORM-specific implementation of ``obj_update``.
+        """
+        if not bundle.obj or not bundle.obj.pk:
+            bundle.obj = self.obj_get(request, **kwargs)
+
+        bundle = self.full_hydrate(bundle)
+
+        # Save the main object.
+        bundle.obj.save()
+
+        return bundle
+
+    def obj_delete_list(self, request=None, **kwargs):
+        filters = QueryDict('')
+
+        if hasattr(request, 'GET'):
+            # Grab a mutable copy.
+            filters = request.GET.copy()
+
+        # Update with the provided kwargs.
+        filters.update(kwargs)
+        applicable_filters = self.build_filters(filters=filters)
+
+        try:
+            base_object_list = self.apply_filters(request, applicable_filters)
+            authed_object_list = self.apply_authorization_limits(request, base_object_list)
+        except ResourceNotFound:
+            raise BadRequest('Invalid resource lookup data provided (mismatched type).')
+
+        if hasattr(authed_object_list, 'delete'):
+            # It's likely a ``QuerySet``. Call ``.delete()`` for efficiency.
+            authed_object_list.delete()
+        else:
+            for authed_obj in authed_object_list:
+                authed_obj.delete()
 
     def obj_delete(self, request=None, **kwargs):
         try:
             obj = self.obj_get(request, **kwargs)
         except ObjectDoesNotExist:
             raise NotFound("A model instance matching the provided arguments could not be found.")
-
         obj.delete()
 
-    # def rollback(self, bundles):
-    #     for bundle in bundles:
-    #         if bundle.obj and getattr(bundle.obj, 'pk', None):
-    #             bundle.obj.delete()
+    def rollback(self, bundles):
+        for bundle in bundles:
+            if bundle.obj and getattr(bundle.obj, 'pk', None):
+                bundle.obj.delete()
 
     def get_resource_uri(self, bundle_or_obj):
         """
@@ -220,9 +244,9 @@ class DocumentResource(Resource):
         }
 
         if isinstance(bundle_or_obj, Bundle):
-            kwargs['pk'] = bundle_or_obj.obj.get_id
+            kwargs['pk'] = bundle_or_obj.obj.pk
         else:
-            kwargs['pk'] = bundle_or_obj.get_id
+            kwargs['pk'] = bundle_or_obj.id
 
         if self._meta.api_name is not None:
             kwargs['api_name'] = self._meta.api_name
@@ -319,8 +343,10 @@ class DocumentResource(Resource):
             # Is the field defined in our resource?
             field = getattr(self, field_name)
 
-            # TODO: Should we do more field checking?
-            if isinstance(value, basestring):
+            # If we have a field defined use its type conversion
+            if field:
+                value = field.convert(value)
+            elif isinstance(value, basestring):
                 if value.lower() in ('true', 'yes'):
                     value = True
                 elif value.lower() in ('false', 'no'):
@@ -329,10 +355,6 @@ class DocumentResource(Resource):
                     value = None
                 # elif value.isnumeric():
                 #     value = int(value)
-
-            # If we have a field defined use its type conversion
-            if field:
-                value = field.convert(value)
 
             # Split on ',' if not empty string and either an in or range filter.
             if filter_type in ('in', 'range') and len(value):
@@ -391,11 +413,24 @@ class DocumentResource(Resource):
 
         return obj_list
 
+    def put_detail(self, request, **kwargs):
+        deserialized = self.deserialize(request, request.raw_post_data, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.alter_deserialized_detail_data(request, deserialized)
+        bundle = self.build_bundle(data=dict_strip_unicode_keys(deserialized), request=request)
+        self.is_valid(bundle, request)
+
+        updated_bundle = self.obj_update(bundle, request=request, **self.remove_api_resource_names(kwargs))
+
+        if not self._meta.always_return_data:
+            return http.HttpNoContent()
+        else:
+            updated_bundle = self.full_dehydrate(updated_bundle)
+            updated_bundle = self.alter_detail_data_to_serialize(request, updated_bundle)
+            return self.create_response(request, updated_bundle, response_class=http.HttpAccepted)
+
 
 class NamespacedDocumentResource(DocumentResource):
-    """
-    A DocumentResource subclass that respects Django namespaces.
-    """
+    """A DocumentResource subclass that respects Django namespaces."""
     def _build_reverse_url(self, name, args=None, kwargs=None):
         namespaced = "%s:%s" % (self._meta.urlconf_namespace, name)
         return reverse(namespaced, args=args, kwargs=kwargs)
