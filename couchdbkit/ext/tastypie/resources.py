@@ -149,7 +149,7 @@ class DocumentResource(Resource):
         return self._meta.object_class.view(self._meta.view, include_docs=self._meta.include_docs)
 
     def obj_get_list(self, request=None, **kwargs):
-        filters = QueryDict('')
+        filters = QueryDict('', mutable=True)
 
         if hasattr(request, 'GET'):
             # Grab a mutable copy.
@@ -198,7 +198,7 @@ class DocumentResource(Resource):
         return bundle
 
     def obj_delete_list(self, request=None, **kwargs):
-        filters = QueryDict('')
+        filters = QueryDict('', mutable=True)
 
         if hasattr(request, 'GET'):
             # Grab a mutable copy.
