@@ -24,6 +24,8 @@ def _get_fields(obj):
 
 
 class SchemaListField(ListField):
+    default = []
+
     def dehydrate(self, bundle):
         if self.attribute is not None:
             obj = getattr(bundle.obj, self.attribute)
@@ -84,6 +86,8 @@ class SchemaListField(ListField):
 
 
 class SchemaDictField(DictField):
+    default = {}
+
     def dehydrate(self, bundle):
         if self.attribute is not None:
             obj = getattr(bundle.obj, self.attribute)
