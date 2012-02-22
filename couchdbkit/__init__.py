@@ -6,6 +6,7 @@ from __future__ import absolute_import
 import logging
 
 from .version import version_info, __version__
+from .changes import ChangesStream
 from .client import Server, Database, ViewResults, View, TempView
 from .consumer import Consumer
 from .designer import document, push, pushdocs, pushapps, clone
@@ -27,6 +28,7 @@ from .schema import (
     SchemaDictProperty, ListProperty, DictProperty, StringListProperty,
     contain, StringProperty, SetProperty
 )
+
 
 LOG_LEVELS = {
     "critical": logging.CRITICAL,
